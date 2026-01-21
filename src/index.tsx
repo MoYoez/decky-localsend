@@ -9,12 +9,16 @@ import {
 import {
   callable,
   definePlugin,
+  addEventListener,
   toaster,
-  fetchNoCors
+  removeEventListener,
+  openFilePicker,
+  FileSelectionType
 } from "@decky/api"
 
 
 import fileOpener from "./utils/fileOpener";
+import { useLocalSendStore } from "./utils/store";
 import { useEffect, useState } from "react";
 import { FaShareAlt } from "react-icons/fa";
 
@@ -37,10 +41,7 @@ type ScanDevice = {
 type FileInfo = {
   id: string;
   fileName: string;
-  size: number;
-  fileType: string;
-  file: File;
-  sourcePath?: string;
+  sourcePath: string;
 };
 
 type UploadProgress = {
@@ -55,21 +56,30 @@ const stopBackend = callable<[], BackendStatus>("stop_backend");
 const getBackendStatus = callable<[], BackendStatus>("get_backend_status");
 const proxyGet = callable<[string], any>("proxy_get");
 const proxyPost = callable<[string, any?, any?], any>("proxy_post");
-const testNotifyCallback = callable<[], { success: boolean; error?: string }>("test_notify_callback");
 const prepareFolderUpload = callable<[string], { success: boolean; path?: string; file_name?: string; size?: number; file_type?: string; error?: string }>("prepare_folder_upload");
+const getNotifyServerStatus = callable<[], { running: boolean; socket_path: string; socket_exists: boolean }>("get_notify_server_status");
+const getUploadSessions = callable<[], any[]>("get_upload_sessions");
+const clearUploadSessions = callable<[], { success: boolean }>("clear_upload_sessions");
 
 function Content() {
+  // Use zustand store for persistent state across component switches
+  const devices = useLocalSendStore((state) => state.devices);
+  const setDevices = useLocalSendStore((state) => state.setDevices);
+  const selectedDevice = useLocalSendStore((state) => state.selectedDevice);
+  const setSelectedDevice = useLocalSendStore((state) => state.setSelectedDevice);
+  const selectedFiles = useLocalSendStore((state) => state.selectedFiles);
+  const addFile = useLocalSendStore((state) => state.addFile);
+  const clearFiles = useLocalSendStore((state) => state.clearFiles);
+  
+  // Local component state (not persisted)
   const [backend, setBackend] = useState<BackendStatus>({
     running: false,
     url: "https://127.0.0.1:53317",
   });
-  const [devices, setDevices] = useState<ScanDevice[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState<ScanDevice | null>(null);
-  const [selectedFiles, setSelectedFiles] = useState<FileInfo[]>([]);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [developerTesting, setDeveloperTesting] = useState(false);
+  const [showDevTools, setShowDevTools] = useState(false);
 
   useEffect(() => {
     getBackendStatus().then(setBackend).catch((error) => {
@@ -108,7 +118,7 @@ function Content() {
     try {
       const result = await proxyGet("/api/self/v1/scan-current");
       if (result.status !== 200) {
-        throw new Error(`scan failed: ${result.status}`);
+        throw new Error(`Scan failed: ${result.status}`);
       }
       setDevices(result.data?.data ?? []);
     } catch (error) {
@@ -121,64 +131,34 @@ function Content() {
     }
   };
 
-  const normalizePickerResult = (result: any): { path: string; realpath: string }[] => {
-    if (!result) return [];
-    if (Array.isArray(result)) return result.filter((item) => item?.realpath);
-    if (result.realpath) return [result];
-    return [];
-  };
-
-  const addFileFromPath = async (realpath: string, displayPath?: string) => {
-    const response = await fetchNoCors(`file://${realpath}`);
-    if (!response.ok) {
-      throw new Error(`Failed to read file: ${response.status}`);
-    }
-
-    const buffer = await response.arrayBuffer();
+  const addFileFromPath = (realpath: string, displayPath?: string) => {
     const fileName = (displayPath ?? realpath).split("/").pop() || "unknown";
-    const file = new File([buffer], fileName, { type: "application/octet-stream" });
-
     const newFile: FileInfo = {
       id: `file-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      fileName: file.name,
-      size: file.size,
-      fileType: file.type,
-      file: file,
+      fileName,
       sourcePath: realpath,
     };
-
-    setSelectedFiles((prev) => {
-      if (prev.some((item) => item.sourcePath === newFile.sourcePath)) {
-        return prev;
-      }
-      return [...prev, newFile];
-    });
+    // Use store's addFile method which handles duplicate checking
+    addFile(newFile);
   };
 
   const handleFileSelect = async () => {
     if (uploading) return;
     try {
-      const result = await fileOpener(
-        "/home/deck",
-        true
+      const result = await openFilePicker(
+        FileSelectionType.FILE,
+        "/home/deck"
       );
 
-      const selections = normalizePickerResult(result);
-      if (selections.length === 0) {
-        return;
-      }
-
-      for (const selection of selections) {
-        await addFileFromPath(selection.realpath, selection.path);
-      }
+      addFileFromPath(result.realpath ?? result.path, result.path);
 
       toaster.toast({
-        title: "Files selected",
-        body: `${selections.length} item(s)`,
+        title: "File selected",
+        body: result.path,
       });
     } catch (error) {
       toaster.toast({
-        title: "File selection failed",
+        title: "Failed to select file",
         body: String(error),
       });
     }
@@ -188,30 +168,26 @@ function Content() {
     if (uploading) return;
     try {
       const result = await fileOpener(
-        "/home/deck/",
+        "/home/deck",
+        false,
+        undefined,
+        undefined,
         true
       );
 
-      const selections = normalizePickerResult(result);
-      if (selections.length === 0) {
-        return;
+      const zipResult = await prepareFolderUpload(result.path);
+      if (!zipResult.success || !zipResult.path) {
+        throw new Error(zipResult.error || "Failed to prepare folder");
       }
-
-      for (const selection of selections) {
-        const zipResult = await prepareFolderUpload(selection.realpath);
-        if (!zipResult.success || !zipResult.path) {
-          throw new Error(zipResult.error || "Failed to prepare folder");
-        }
-        await addFileFromPath(zipResult.path, zipResult.file_name ?? selection.path);
-      }
+      addFileFromPath(zipResult.path, zipResult.file_name ?? result.path);
 
       toaster.toast({
-        title: "Folders selected",
-        body: `${selections.length} item(s)`,
+        title: "Folder selected",
+        body: result.path,
       });
     } catch (error) {
       toaster.toast({
-        title: "Folder selection failed",
+        title: "Failed to select folder",
         body: String(error),
       });
     }
@@ -243,14 +219,11 @@ function Content() {
     setUploadProgress(progress);
 
     try {
-      // Step 1: Prepare upload
-      const filesMap: Record<string, any> = {};
+      const filesMap: Record<string, { id: string; fileUrl: string }> = {};
       selectedFiles.forEach((f) => {
         filesMap[f.id] = {
           id: f.id,
-          fileName: f.fileName,
-          size: f.size,
-          fileType: f.fileType,
+          fileUrl: `file://${f.sourcePath}`,
         };
       });
 
@@ -268,58 +241,67 @@ function Content() {
 
       const { sessionId, files: tokens } = prepareResult.data.data;
 
-      // Step 2: Upload each file
-      for (const fileInfo of selectedFiles) {
-        const token = tokens[fileInfo.id];
-        if (!token) {
-          progress = progress.map((p) =>
-            p.fileId === fileInfo.id
-              ? { ...p, status: 'error', error: 'No token received' }
-              : p
-          );
-          setUploadProgress(progress);
-          continue;
-        }
+      progress = progress.map((p) => ({ ...p, status: 'uploading' }));
+      setUploadProgress(progress);
 
-        progress = progress.map((p) =>
-          p.fileId === fileInfo.id ? { ...p, status: 'uploading' } : p
-        );
+      const batchFiles = selectedFiles.map((fileInfo) => ({
+        fileId: fileInfo.id,
+        token: tokens[fileInfo.id] || "",
+        fileUrl: `file://${fileInfo.sourcePath}`,
+      }));
+
+      const batchUploadResult = await proxyPost(
+        "/api/self/v1/upload-batch",
+        {
+          sessionId: sessionId,
+          files: batchFiles,
+        }
+      );
+
+      if (batchUploadResult.status === 200) {
+        const result = batchUploadResult.data?.result;
+        if (result?.results) {
+          progress = progress.map((p) => {
+            const uploadResult = result.results.find((r: any) => r.fileId === p.fileId);
+            if (uploadResult?.success) {
+              return { ...p, status: 'done' };
+            } else {
+              return { ...p, status: 'error', error: uploadResult?.error || 'Upload failed' };
+            }
+          });
+        } else {
+          progress = progress.map((p) => ({ ...p, status: 'done' }));
+        }
+        setUploadProgress(progress);
+        
+        toaster.toast({
+          title: "Upload complete",
+          body: `Successfully uploaded ${selectedFiles.length} file(s)`,
+        });
+        // Clear files after successful upload
+        clearFiles();
+      } else if (batchUploadResult.status === 207) {
+        const result = batchUploadResult.data?.result;
+        if (result?.results) {
+          progress = progress.map((p) => {
+            const uploadResult = result.results.find((r: any) => r.fileId === p.fileId);
+            if (uploadResult?.success) {
+              return { ...p, status: 'done' };
+            } else {
+              return { ...p, status: 'error', error: uploadResult?.error || 'Upload failed' };
+            }
+          });
+        }
         setUploadProgress(progress);
 
-        try {
-          const fileBuffer = await fileInfo.file.arrayBuffer();
-          const uint8Array = Array.from(new Uint8Array(fileBuffer));
-          
-          const uploadPath = `/api/self/v1/upload?sessionId=${encodeURIComponent(sessionId)}&fileId=${encodeURIComponent(fileInfo.id)}&token=${encodeURIComponent(token)}`;
-          const uploadResult = await proxyPost(uploadPath, null, uint8Array);
-
-          if (uploadResult.status !== 200) {
-            throw new Error(uploadResult.data?.error || `Upload failed: ${uploadResult.status}`);
-          }
-
-          progress = progress.map((p) =>
-            p.fileId === fileInfo.id ? { ...p, status: 'done' } : p
-          );
-          setUploadProgress(progress);
-        } catch (error) {
-          progress = progress.map((p) =>
-            p.fileId === fileInfo.id
-              ? { ...p, status: 'error', error: String(error) }
-              : p
-          );
-          setUploadProgress(progress);
-        }
-      }
-
-      const allSuccess = progress.every((p) => p.status === 'done');
-      toaster.toast({
-        title: allSuccess ? "Upload complete" : "Upload finished with errors",
-        body: `${progress.filter((p) => p.status === 'done').length}/${selectedFiles.length} files uploaded`,
-      });
-
-      // Clear selected files after successful upload
-      if (allSuccess) {
-        setSelectedFiles([]);
+        const successCount = result?.success || 0;
+        const failedCount = result?.failed || 0;
+        toaster.toast({
+          title: "Partial upload complete",
+          body: `Success: ${successCount}, Failed: ${failedCount}`,
+        });
+      } else {
+        throw new Error(batchUploadResult.data?.error || `Batch upload failed: ${batchUploadResult.status}`);
       }
     } catch (error) {
       toaster.toast({
@@ -335,28 +317,60 @@ function Content() {
   };
 
   const handleClearFiles = () => {
-    setSelectedFiles([]);
+    // Use store's clearFiles method
+    clearFiles();
     setUploadProgress([]);
   };
 
-  const handleTestCallback = async () => {
-    setDeveloperTesting(true);
+  const handleCheckNotifyStatus = async () => {
     try {
-      const result = await testNotifyCallback();
-      if (!result.success) {
-        throw new Error(result.error || "Unknown error");
-      }
+      const status = await getNotifyServerStatus();
       toaster.toast({
-        title: "Callback test succeeded",
-        body: "Sent test notification to Flask",
+        title: "Notification Server Status",
+        body: `Running: ${status.running}, Socket exists: ${status.socket_exists}`,
       });
     } catch (error) {
       toaster.toast({
-        title: "Callback test failed",
+        title: "Failed to get status",
         body: String(error),
       });
-    } finally {
-      setDeveloperTesting(false);
+    }
+  };
+
+  const handleViewUploadHistory = async () => {
+    try {
+      const sessions = await getUploadSessions();
+      if (sessions.length === 0) {
+        toaster.toast({
+          title: "Upload History",
+          body: "No upload records",
+        });
+      } else {
+        toaster.toast({
+          title: "Upload History",
+          body: `Total: ${sessions.length} files`,
+        });
+      }
+    } catch (error) {
+      toaster.toast({
+        title: "Failed to get history",
+        body: String(error),
+      });
+    }
+  };
+
+  const handleClearHistory = async () => {
+    try {
+      await clearUploadSessions();
+      toaster.toast({
+        title: "History Cleared",
+        body: "Upload history has been cleared",
+      });
+    } catch (error) {
+      toaster.toast({
+        title: "Failed to clear history",
+        body: String(error),
+      });
     }
   };
 
@@ -397,12 +411,12 @@ function Content() {
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleFileSelect} disabled={uploading}>
-            Select Files (Multi)
+            Choose File
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleFolderSelect} disabled={uploading}>
-            Select Folder
+            Choose Folder
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
@@ -425,7 +439,7 @@ function Content() {
               <Focusable style={{ maxHeight: '150px', overflowY: 'auto' }}>
                 {selectedFiles.map((file) => (
                   <div key={file.id} style={{ padding: '4px 0', fontSize: '12px' }}>
-                    {file.fileName} ({(file.size / 1024).toFixed(1)} KB)
+                    {file.fileName}
                   </div>
                 ))}
               </Focusable>
@@ -452,12 +466,31 @@ function Content() {
           </PanelSectionRow>
         )}
       </PanelSection>
-      <PanelSection title="Developer Settings">
+      <PanelSection title="Developer Tools">
         <PanelSectionRow>
-          <ButtonItem layout="below" onClick={handleTestCallback} disabled={developerTesting}>
-            {developerTesting ? "Testing..." : "Test Callback"}
+          <ButtonItem layout="below" onClick={() => setShowDevTools(!showDevTools)}>
+            {showDevTools ? "Hide Tools" : "Show Tools"}
           </ButtonItem>
         </PanelSectionRow>
+        {showDevTools && (
+          <>
+            <PanelSectionRow>
+              <ButtonItem layout="below" onClick={handleCheckNotifyStatus}>
+                Check Notify Server
+              </ButtonItem>
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <ButtonItem layout="below" onClick={handleViewUploadHistory}>
+                View Upload History
+              </ButtonItem>
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <ButtonItem layout="below" onClick={handleClearHistory}>
+                Clear History
+              </ButtonItem>
+            </PanelSectionRow>
+          </>
+        )}
       </PanelSection>
     </>
   );
@@ -503,7 +536,12 @@ function DevicesPanel({
 };
 
 export default definePlugin(() => {
-  console.log("localsend plugin initializing");
+  const EmitEventListener = addEventListener("unix_socket_notification", (event: { title: string; message: string }) => {
+    toaster.toast({
+      title: event.title,
+      body: event.message,
+    });
+  });
 
   return {
     // The name shown in various decky menus
@@ -517,6 +555,7 @@ export default definePlugin(() => {
     // The function triggered when your plugin unloads
     onDismount() {
       console.log("Unloading");
+      removeEventListener("unix_socket_notification", EmitEventListener);
     },
   };
 });

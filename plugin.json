@@ -1,5 +1,5 @@
 {
-  "name": "decky-plugin-localsend",
+  "name": "decky-localsend",
   "author": "MoeMagicMango",
   "flags": ["localsend", "_root"],
   "api_version": 1,

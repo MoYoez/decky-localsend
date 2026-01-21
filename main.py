@@ -3,18 +3,21 @@ import sys
 import asyncio
 import subprocess
 import time
-import threading
 import zipfile
-from typing import Optional, Dict, Any
+import socket
+import json
+import threading
+
+import requests
+from typing import Dict, Any
 
 py_modules_path = os.path.join(os.path.dirname(__file__), "py_modules")
 if py_modules_path not in sys.path:
     sys.path.insert(0, py_modules_path)
 
-import requests
+
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from flask import Flask, request, jsonify
 import decky
 
 
@@ -25,16 +28,16 @@ class Plugin:
         self.log_file = None
         self.backend_port = 53317
         self.backend_protocol = "https"
-        self.notify_port = 9000  # Flask server port for receiving notifications from Go backend
         self.config_path = os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "localsend.yaml")
         self.upload_dir = os.path.join(decky.DECKY_PLUGIN_RUNTIME_DIR, "uploads")
         self.binary_path = os.path.join(decky.DECKY_PLUGIN_DIR, "bin", "localsend-core")
         self.backend_url = f"{self.backend_protocol}://127.0.0.1:{self.backend_port}"
         
-        # Flask application and server thread
-        self.flask_app: Optional[Flask] = None
-        self.flask_thread: Optional[threading.Thread] = None
-        self.flask_shutdown = threading.Event()
+        # Unix Domain Socket notification server
+        self.socket_path = "/tmp/localsend-notify.sock"
+        self.notify_socket = None
+        self.notify_thread = None
+        self.notify_shutdown = threading.Event()
         
         # Upload session tracking
         self.upload_sessions: Dict[str, Dict[str, Any]] = {}
@@ -44,122 +47,191 @@ class Plugin:
         os.makedirs(self.upload_dir, exist_ok=True)
         os.makedirs(decky.DECKY_PLUGIN_LOG_DIR, exist_ok=True)
 
-    def _create_flask_app(self) -> Flask:
-        """Create Flask application to receive notifications from Go backend"""
-        app = Flask(__name__)
-        
-        # Disable Flask logging, use decky logger instead
-        import logging
-        log = logging.getLogger('werkzeug')
-        log.setLevel(logging.ERROR)
-        
-        @app.route('/api/py-backend/v1/notify', methods=['POST'])
-        def receive_notification():
-            """Receive file upload notifications from Go service"""
-            try:
-                data = request.get_json()
-                if not data:
-                    return jsonify({'status': 'error', 'message': 'No data received'}), 400
-                
-                notification_type = data.get('type')
-                title = data.get('title', '')
-                message = data.get('message', '')
-                notification_data = data.get('data', {})
-                
-                session_id = notification_data.get('sessionId', '')
-                file_id = notification_data.get('fileId', '')
-                file_name = notification_data.get('fileName', '')
-                file_size = notification_data.get('size', 0)
-                file_type = notification_data.get('fileType', '')
-                sha256 = notification_data.get('sha256', '')
-                
-                if notification_type == 'upload_start':
-                    decky.logger.info(f"📤 Upload started: {file_name} (size: {file_size} bytes)")
-                    decky.logger.info(f"   Session ID: {session_id}, File ID: {file_id}")
-                    
-                    # Save upload session information
-                    self.upload_sessions[session_id] = {
-                        'file_id': file_id,
-                        'file_name': file_name,
-                        'file_size': file_size,
-                        'file_type': file_type,
-                        'sha256': sha256,
-                        'start_time': time.time(),
-                        'status': 'uploading'
-                    }
-                    
-                elif notification_type == 'upload_end':
-                    decky.logger.info(f"✅ Upload completed: {file_name} (size: {file_size} bytes)")
-                    decky.logger.info(f"   Session ID: {session_id}, SHA256: {sha256}")
-                    
-                    # Update upload session status
-                    if session_id in self.upload_sessions:
-                        session = self.upload_sessions[session_id]
-                        session['status'] = 'completed'
-                        session['end_time'] = time.time()
-                        duration = session['end_time'] - session.get('start_time', 0)
-                        decky.logger.info(f"   Upload duration: {duration:.2f} seconds")
-                else:
-                    decky.logger.warning(f"Unknown notification type: {notification_type}")
-                
-                return jsonify({'status': 'ok', 'message': 'Notification received'}), 200
-                
-            except Exception as e:
-                decky.logger.error(f"❌ Error processing notification: {str(e)}")
-                return jsonify({'status': 'error', 'message': str(e)}), 400
-        
-        @app.route('/health', methods=['GET'])
-        def health():
-            """Health check endpoint"""
-            return jsonify({'status': 'ok', 'service': 'decky-localsend-notify'}), 200
-        
-        return app
-    
-    def _start_flask_server(self):
-        """Start Flask server in background thread"""
-        if self.flask_thread is not None and self.flask_thread.is_alive():
-            decky.logger.info("Flask server is already running")
+    def _start_notify_server(self):
+        """Start Unix Domain Socket notification server"""
+        if self.notify_thread is not None and self.notify_thread.is_alive():
+            decky.logger.info("Notification server is already running")
             return
         
-        self.flask_app = self._create_flask_app()
-        self.flask_shutdown.clear()
-        
-        def run_flask():
+        # Cleanup existing socket
+        if os.path.exists(self.socket_path):
             try:
-                self.flask_app.run(
-                    host='127.0.0.1',
-                    port=self.notify_port,
-                    debug=False,
-                    use_reloader=False,
-                    threaded=True
-                )
+                os.remove(self.socket_path)
             except Exception as e:
-                decky.logger.error(f"Flask server error: {e}")
+                decky.logger.warning(f"Failed to remove existing socket: {e}")
         
-        self.flask_thread = threading.Thread(target=run_flask, daemon=True)
-        self.flask_thread.start()
-        decky.logger.info(f"Flask notification server started on port: {self.notify_port}")
+        self.notify_shutdown.clear()
+        
+        def run_notify_server():
+            try:
+                # Create Unix socket
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                sock.bind(self.socket_path)
+                sock.listen(5)
+                sock.settimeout(1.0)  # Allow periodic checks for shutdown
+                self.notify_socket = sock
+                
+                decky.logger.info(f"📡 Notification server listening on: {self.socket_path}")
+                
+                while not self.notify_shutdown.is_set():
+                    try:
+                        conn, _ = sock.accept()
+                        # Handle connection in the same thread (simple implementation)
+                        try:
+                            data = conn.recv(4096)
+                            if data:
+                                notification = json.loads(data.decode('utf-8'))
+                                self._handle_notification(notification)
+                                
+                                # Send response
+                                response = {"ok": True}
+                                conn.send(json.dumps(response).encode('utf-8'))
+                        except json.JSONDecodeError as e:
+                            decky.logger.error(f"Failed to parse notification JSON: {e}")
+                        except Exception as e:
+                            decky.logger.error(f"Error handling connection: {e}")
+                        finally:
+                            conn.close()
+                    except socket.timeout:
+                        # Timeout is expected, continue loop
+                        continue
+                    except Exception as e:
+                        if not self.notify_shutdown.is_set():
+                            decky.logger.error(f"Socket accept error: {e}")
+                        break
+                
+            except Exception as e:
+                decky.logger.error(f"Notification server error: {e}")
+            finally:
+                if self.notify_socket:
+                    try:
+                        self.notify_socket.close()
+                    except:
+                        pass
+                    self.notify_socket = None
+                
+                # Cleanup socket file
+                if os.path.exists(self.socket_path):
+                    try:
+                        os.remove(self.socket_path)
+                    except:
+                        pass
+                
+                decky.logger.info("📡 Notification server stopped")
+        
+        self.notify_thread = threading.Thread(target=run_notify_server, daemon=True)
+        self.notify_thread.start()
     
-    def _stop_flask_server(self):
-        """Stop Flask server"""
-        if self.flask_thread is None or not self.flask_thread.is_alive():
+    def _stop_notify_server(self):
+        """Stop Unix Domain Socket notification server"""
+        if self.notify_thread is None or not self.notify_thread.is_alive():
             return
         
-        self.flask_shutdown.set()
-        
-        # Try to trigger server shutdown via request
-        try:
-            requests.get(f"http://127.0.0.1:{self.notify_port}/health", timeout=1)
-        except:
-            pass
+        decky.logger.info("Stopping notification server...")
+        self.notify_shutdown.set()
         
         # Wait for thread to finish
-        if self.flask_thread:
-            self.flask_thread.join(timeout=2)
+        if self.notify_thread:
+            self.notify_thread.join(timeout=3)
         
-        self.flask_thread = None
-        self.flask_app = None
-        decky.logger.info("Flask notification server stopped")
+        self.notify_thread = None
+        decky.logger.info("Notification server stopped")
+    
+    def _emit_notification_safe(self, title: str, message: str):
+        """Safely emit notification from thread to main event loop"""
+        if self.loop is None or self.loop.is_closed():
+            decky.logger.warning("Event loop not available, skipping notification emit")
+            return
+        
+        try:
+            asyncio.run_coroutine_threadsafe(
+                decky.emit("unix_socket_notification", {
+                    "title": title,
+                    "message": message
+                }),
+                self.loop
+            )
+        except Exception as e:
+            decky.logger.error(f"Failed to emit notification: {e}")
+    
+    def _handle_notification(self, notification: dict):
+        """Handle incoming notification from Go backend"""
+        try:
+            notification_type = notification.get('type')
+            title = notification.get('title', '')
+            message = notification.get('message', '')
+            notification_data = notification.get('data', {})
+            
+            session_id = notification_data.get('sessionId', '')
+            file_id = notification_data.get('fileId', '')
+            file_name = notification_data.get('fileName', '')
+            file_size = notification_data.get('size', 0)
+            file_type = notification_data.get('fileType', '')
+            sha256 = notification_data.get('sha256', '')
+            
+            if notification_type == 'upload_start':
+                decky.logger.info(f"📤 Upload started: {file_name} (size: {file_size} bytes)")
+                decky.logger.info(f"   Session ID: {session_id}, File ID: {file_id}")
+                
+                # Emit event to frontend
+                self._emit_notification_safe(
+                    "Upload Started",
+                    f"File upload started: {file_name} (size: {file_size} bytes)"
+                )
+                
+                # Save upload session information
+                if session_id not in self.upload_sessions:
+                    self.upload_sessions[session_id] = {}
+                
+                self.upload_sessions[session_id][file_id] = {
+                    'file_id': file_id,
+                    'file_name': file_name,
+                    'file_size': file_size,
+                    'file_type': file_type,
+                    'sha256': sha256,
+                    'start_time': time.time(),
+                    'status': 'uploading'
+                }
+                
+            elif notification_type == 'upload_end':
+                decky.logger.info(f"✅ Upload completed: {file_name} (size: {file_size} bytes)")
+                decky.logger.info(f"   Session ID: {session_id}, SHA256: {sha256}")
+                
+                # Emit event to frontend
+                self._emit_notification_safe(
+                    "Upload Completed",
+                    f"File upload completed: {file_name} (size: {file_size} bytes)"
+                )
+                
+                # Update upload session status
+                if session_id in self.upload_sessions and file_id in self.upload_sessions[session_id]:
+                    file_session = self.upload_sessions[session_id][file_id]
+                    file_session['status'] = 'completed'
+                    file_session['end_time'] = time.time()
+                    duration = file_session['end_time'] - file_session.get('start_time', 0)
+                    decky.logger.info(f"   Upload duration: {duration:.2f} seconds")
+                    
+            elif notification_type == 'info':
+                decky.logger.info(f"ℹ️  {title}: {message}")
+                
+                # Emit event to frontend
+                self._emit_notification_safe("Info", f"{title}: {message}")
+                
+            else:
+                decky.logger.warning(f"⚠️  Unknown notification type: {notification_type}")
+                
+                # Emit event to frontend
+                self._emit_notification_safe(
+                    "Unknown Notification Type",
+                    f"Unknown notification type: {notification_type}"
+                )
+                
+        except Exception as e:
+            decky.logger.error(f"❌ Error processing notification: {str(e)}")
+            self._emit_notification_safe(
+                "Error",
+                f"Error processing notification: {str(e)}"
+            )
 
     def _is_running(self) -> bool:
         return self.process is not None and self.process.poll() is None
@@ -175,7 +247,7 @@ class Plugin:
         self.log_file = open(log_path, "a", encoding="utf-8")
         env = os.environ.copy()
 
-        # Build startup command with Python backend notification URL
+        # Build startup command
         cmd = [
             self.binary_path,
             "-useConfigPath",
@@ -212,7 +284,7 @@ class Plugin:
 
     async def start_backend(self):
         try:
-            self._start_flask_server()
+            self._start_notify_server()
             self._start_backend()
             return {"running": True, "url": self.backend_url}
         except Exception as error:
@@ -287,11 +359,12 @@ class Plugin:
     async def get_upload_sessions(self):
         """Get upload session records"""
         sessions = []
-        for session_id, session_data in self.upload_sessions.items():
-            sessions.append({
-                'session_id': session_id,
-                **session_data
-            })
+        for session_id, files in self.upload_sessions.items():
+            for file_id, file_data in files.items():
+                sessions.append({
+                    'session_id': session_id,
+                    **file_data
+                })
         # Sort by start time in descending order
         sessions.sort(key=lambda x: x.get('start_time', 0), reverse=True)
         return sessions
@@ -304,41 +377,12 @@ class Plugin:
     
     async def get_notify_server_status(self):
         """Get notification server status"""
-        is_running = self.flask_thread is not None and self.flask_thread.is_alive()
+        is_running = self.notify_thread is not None and self.notify_thread.is_alive()
         return {
             "running": is_running,
-            "port": self.notify_port,
-            "url": f"http://127.0.0.1:{self.notify_port}"
+            "socket_path": self.socket_path,
+            "socket_exists": os.path.exists(self.socket_path)
         }
-    
-    async def test_notify_callback(self):
-        """Send a test notification to the Flask server"""
-        self._start_flask_server()
-        try:
-            response = requests.post(
-                f"http://127.0.0.1:{self.notify_port}/api/py-backend/v1/notify",
-                json={
-                    "type": "upload_end",
-                    "title": "Test Callback",
-                    "message": "This is a test notification",
-                    "data": {
-                        "sessionId": f"test-{int(time.time())}",
-                        "fileId": "test-file",
-                        "fileName": "callback-test.txt",
-                        "size": 1234,
-                        "fileType": "text/plain",
-                        "sha256": "test-sha256"
-                    }
-                },
-                timeout=3,
-                verify=False
-            )
-            if response.status_code != 200:
-                return {"success": False, "error": f"HTTP {response.status_code}"}
-            return {"success": True}
-        except Exception as e:
-            decky.logger.error(f"Test callback failed: {e}")
-            return {"success": False, "error": str(e)}
 
     async def prepare_folder_upload(self, folder_path: str):
         """Zip a folder for upload and return the archive path"""
@@ -372,17 +416,16 @@ class Plugin:
 
     async def _main(self):
         self.loop = asyncio.get_event_loop()
-        # Start Flask notification server
-        self._start_flask_server()
+        self._start_notify_server()
         decky.logger.info("localsend plugin loaded")
 
     async def _unload(self):
         self._stop_backend()
-        self._stop_flask_server()
+        self._stop_notify_server()
 
     async def _uninstall(self):
         self._stop_backend()
-        self._stop_flask_server()
+        self._stop_notify_server()
 
     async def _migration(self):
         decky.logger.info("Migrating")

@@ -1,3 +1,2 @@
-# Python dependencies for decky-plugin-localsend
+# Python dependencies for decky-localsend
 requests>=2.32.3
-flask>=3.1.2

@@ -1,5 +1,5 @@
 {
-  "name": "decky-plugin-localsend",
+  "name": "decky-localsend",
   "version": "0.0.1",
   "description": "Use Localsend in gaming mode.",
   "type": "module",
@@ -10,7 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/moyoez/decky-plugin-localsend.git"
+    "url": "git+https://github.com/moyoez/decky-localsend.git"
   },
   "keywords": [
     "decky",
@@ -19,7 +19,7 @@
   ],
   "author": "MoeMagicMango <i@lemonkoi.one>",
   "license": "MIT",
-  "homepage": "https://github.com/SteamDeckHomebrew/decky-plugin-template#readme",
+  "homepage": "https://github.com/moyoez/decky-localsend#readme",
   "devDependencies": {
     "@decky/rollup": "^1.0.2",
     "@decky/ui": "^4.11.0",
@@ -33,7 +33,8 @@
   "dependencies": {
     "@decky/api": "^1.1.3",
     "react-icons": "^5.3.0",
-    "tslib": "^2.7.0"
+    "tslib": "^2.7.0",
+    "zustand": "^5.0.2"
   },
   "pnpm": {
     "peerDependencyRules": {
