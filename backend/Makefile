@@ -1,14 +1,20 @@
-# This is the default target, which will be built when 
-# you invoke make
-.PHONY: all
-all: hello
+.PHONY: all build clean
 
-# This rule tells make how to build hello from hello.cpp
-hello:
-	mkdir -p ./out
-	gcc -o ./out/hello ./src/main.c 
+SUBMODULE_DIR := localsend
+OUT_DIR := out
+BINARY_NAME := localsend-core
 
-# This rule tells make to delete hello and hello.o
-.PHONY: clean 
+all: build
+
+build:
+	@if [ ! -f "$(SUBMODULE_DIR)/go.mod" ]; then \
+		echo "localsend submodule missing. Run: git submodule update --init --recursive"; \
+		exit 1; \
+	fi
+	mkdir -p "$(OUT_DIR)"
+	cd "$(SUBMODULE_DIR)" && \
+		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOPROXY=https://goproxy.cn,direct \
+		go build -trimpath -ldflags "-s -w" -o "../$(OUT_DIR)/$(BINARY_NAME)" .
+
 clean:
-	rm -f hello
+	rm -f "$(OUT_DIR)/$(BINARY_NAME)"

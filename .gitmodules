@@ -1,0 +1,3 @@
+[submodule "backend/localsend"]
+	path = backend/localsend
+	url = https://github.com/MoYoez/localsend-base-protocol-golang

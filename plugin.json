@@ -1,11 +1,11 @@
 {
-  "name": "Example Plugin",
-  "author": "John Doe",
-  "flags": ["debug", "_root"],
+  "name": "decky-plugin-localsend",
+  "author": "MoeMagicMango",
+  "flags": ["localsend", "_root"],
   "api_version": 1,
   "publish": {
-    "tags": ["template", "root"],
-    "description": "Decky example plugin.",
-    "image": "https://opengraph.githubassets.com/1/SteamDeckHomebrew/PluginLoader"
+    "tags": ["localsend", "root"],
+    "description": "Use Localsend in gaming mode.",
+    "image": "https://opengraph.githubassets.com/1/moyoez/decky-plugin-localsend"
   }
 }

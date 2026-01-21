@@ -37,6 +37,11 @@ dist/
 
 __pycache__/
 
+# Python modules - ignore installed dependencies but keep the folder structure
+py_modules/*
+!py_modules/.gitkeep
+!py_modules/.keep
+
 /.yalc
 yalc.lock
 
@@ -55,3 +60,8 @@ out/*
 cli/
 cli/*
 cli/decky
+
+
+test/*
+
+.vscode/*

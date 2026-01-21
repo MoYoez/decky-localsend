@@ -1,7 +1,7 @@
 {
-  "name": "decky-plugin-template",
+  "name": "decky-plugin-localsend",
   "version": "0.0.1",
-  "description": "A template to quickly create decky plugins from scratch, based on TypeScript and webpack",
+  "description": "Use Localsend in gaming mode.",
   "type": "module",
   "scripts": {
     "build": "rollup -c",
@@ -10,20 +10,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/SteamDeckHomebrew/decky-plugin-template.git"
+    "url": "git+https://github.com/moyoez/decky-plugin-localsend.git"
   },
   "keywords": [
     "decky",
     "plugin",
-    "plugin-template",
-    "steam-deck",
-    "deck"
+    "localsend"
   ],
-  "author": "You <you@you.tld>",
-  "license": "BSD-3-Clause",
-  "bugs": {
-    "url": "https://github.com/SteamDeckHomebrew/decky-plugin-template/issues"
-  },
+  "author": "MoeMagicMango <i@lemonkoi.one>",
+  "license": "MIT",
   "homepage": "https://github.com/SteamDeckHomebrew/decky-plugin-template#readme",
   "devDependencies": {
     "@decky/rollup": "^1.0.2",
