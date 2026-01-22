@@ -2,6 +2,8 @@
 
 # decky-localsend
 
+![preview](.github/assets/preview.jpg)
+
 A Decky Loader plugin that brings LocalSend functionality to Steam Deck gaming mode.
 
 </div>
