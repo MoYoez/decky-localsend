@@ -4,74 +4,47 @@ import {
   PanelSectionRow,
   staticClasses,
   Field,
-  Focusable
+  Focusable,
+  ToggleField,
+  showModal,  
 } from "@decky/ui";
 import {
-  callable,
   definePlugin,
   addEventListener,
   toaster,
   removeEventListener,
-  openFilePicker,
-  FileSelectionType
 } from "@decky/api"
 
-
-import fileOpener from "./utils/fileOpener";
 import { useLocalSendStore } from "./utils/store";
 import { useEffect, useState } from "react";
-import { FaShareAlt } from "react-icons/fa";
+import { FaShareAlt, FaTimes } from "react-icons/fa";
+import DevicesPanel from "./components/device";
+import { TextReceivedModal } from "./components/TextReceivedModal";
 
-type BackendStatus = {
-  running: boolean;
-  url: string;
-  error?: string;
-};
+import type { BackendStatus } from "./types/backend";
+import type { UploadProgress } from "./types/upload";
 
-type ScanDevice = {
-  alias?: string;
-  ip_address?: string;
-  deviceModel?: string;
-  deviceType?: string;
-  fingerprint?: string;
-  port?: number;
-  protocol?: string;
-};
-
-type FileInfo = {
-  id: string;
-  fileName: string;
-  sourcePath: string;
-};
-
-type UploadProgress = {
-  fileId: string;
-  fileName: string;
-  status: 'pending' | 'uploading' | 'done' | 'error';
-  error?: string;
-};
-
-const startBackend = callable<[], BackendStatus>("start_backend");
-const stopBackend = callable<[], BackendStatus>("stop_backend");
-const getBackendStatus = callable<[], BackendStatus>("get_backend_status");
-const proxyGet = callable<[string], any>("proxy_get");
-const proxyPost = callable<[string, any?, any?], any>("proxy_post");
-const prepareFolderUpload = callable<[string], { success: boolean; path?: string; file_name?: string; size?: number; file_type?: string; error?: string }>("prepare_folder_upload");
-const getNotifyServerStatus = callable<[], { running: boolean; socket_path: string; socket_exists: boolean }>("get_notify_server_status");
-const getUploadSessions = callable<[], any[]>("get_upload_sessions");
-const clearUploadSessions = callable<[], { success: boolean }>("clear_upload_sessions");
+import { getBackendStatus } from "./functions/api";
+import { createBackendHandlers } from "./functions/backendHandlers";
+import { createDeviceHandlers } from "./functions/deviceHandlers";
+import { createFileHandlers } from "./functions/fileHandlers";
+import { createUploadHandlers } from "./functions/uploadHandlers";
+import { createDevToolsHandlers } from "./functions/devToolsHandlers";
+// import { createTextHandlers } from "./functions/textHandlers"; // Reserved for future direct text sending
 
 function Content() {
-  // Use zustand store for persistent state across component switches
+
   const devices = useLocalSendStore((state) => state.devices);
   const setDevices = useLocalSendStore((state) => state.setDevices);
   const selectedDevice = useLocalSendStore((state) => state.selectedDevice);
   const setSelectedDevice = useLocalSendStore((state) => state.setSelectedDevice);
   const selectedFiles = useLocalSendStore((state) => state.selectedFiles);
   const addFile = useLocalSendStore((state) => state.addFile);
+  const removeFile = useLocalSendStore((state) => state.removeFile);
   const clearFiles = useLocalSendStore((state) => state.clearFiles);
+  const resetAll = useLocalSendStore((state) => state.resetAll);
   
-  // Local component state (not persisted)
+  // Default config
   const [backend, setBackend] = useState<BackendStatus>({
     running: false,
     url: "https://127.0.0.1:53317",
@@ -90,302 +63,43 @@ function Content() {
     });
   }, []);
 
-  const handleStart = async () => {
-    const status = await startBackend();
-    setBackend(status);
-    if (!status.running) {
-      toaster.toast({
-        title: "Failed to start",
-        body: status.error ?? "Unknown error",
-      });
-    }
-  };
 
-  const handleStop = async () => {
-    const status = await stopBackend();
-    setBackend(status);
-  };
-
-  const handleScan = async () => {
-    if (!backend.running) {
-      toaster.toast({
-        title: "Backend not running",
-        body: "Please start the LocalSend backend first",
-      });
-      return;
-    }
-    setLoading(true);
-    try {
-      const result = await proxyGet("/api/self/v1/scan-current");
-      if (result.status !== 200) {
-        throw new Error(`Scan failed: ${result.status}`);
-      }
-      setDevices(result.data?.data ?? []);
-    } catch (error) {
-      toaster.toast({
-        title: "Scan failed",
-        body: `${error}`,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const addFileFromPath = (realpath: string, displayPath?: string) => {
-    const fileName = (displayPath ?? realpath).split("/").pop() || "unknown";
-    const newFile: FileInfo = {
-      id: `file-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      fileName,
-      sourcePath: realpath,
-    };
-    // Use store's addFile method which handles duplicate checking
-    addFile(newFile);
-  };
-
-  const handleFileSelect = async () => {
-    if (uploading) return;
-    try {
-      const result = await openFilePicker(
-        FileSelectionType.FILE,
-        "/home/deck"
-      );
-
-      addFileFromPath(result.realpath ?? result.path, result.path);
-
-      toaster.toast({
-        title: "File selected",
-        body: result.path,
-      });
-    } catch (error) {
-      toaster.toast({
-        title: "Failed to select file",
-        body: String(error),
-      });
-    }
-  };
-
-  const handleFolderSelect = async () => {
-    if (uploading) return;
-    try {
-      const result = await fileOpener(
-        "/home/deck",
-        false,
-        undefined,
-        undefined,
-        true
-      );
-
-      const zipResult = await prepareFolderUpload(result.path);
-      if (!zipResult.success || !zipResult.path) {
-        throw new Error(zipResult.error || "Failed to prepare folder");
-      }
-      addFileFromPath(zipResult.path, zipResult.file_name ?? result.path);
-
-      toaster.toast({
-        title: "Folder selected",
-        body: result.path,
-      });
-    } catch (error) {
-      toaster.toast({
-        title: "Failed to select folder",
-        body: String(error),
-      });
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!selectedDevice) {
-      toaster.toast({
-        title: "No device selected",
-        body: "Please select a target device first",
-      });
-      return;
-    }
-
-    if (selectedFiles.length === 0) {
-      toaster.toast({
-        title: "No files selected",
-        body: "Please select files to upload",
-      });
-      return;
-    }
-
-    setUploading(true);
-    let progress: UploadProgress[] = selectedFiles.map((f) => ({
-      fileId: f.id,
-      fileName: f.fileName,
-      status: 'pending',
-    }));
-    setUploadProgress(progress);
-
-    try {
-      const filesMap: Record<string, { id: string; fileUrl: string }> = {};
-      selectedFiles.forEach((f) => {
-        filesMap[f.id] = {
-          id: f.id,
-          fileUrl: `file://${f.sourcePath}`,
-        };
-      });
-
-      const prepareResult = await proxyPost(
-        "/api/self/v1/prepare-upload",
-        {
-          targetTo: selectedDevice.fingerprint,
-          files: filesMap,
-        }
-      );
-
-      if (prepareResult.status !== 200) {
-        throw new Error(prepareResult.data?.error || `Prepare upload failed: ${prepareResult.status}`);
-      }
-
-      const { sessionId, files: tokens } = prepareResult.data.data;
-
-      progress = progress.map((p) => ({ ...p, status: 'uploading' }));
-      setUploadProgress(progress);
-
-      const batchFiles = selectedFiles.map((fileInfo) => ({
-        fileId: fileInfo.id,
-        token: tokens[fileInfo.id] || "",
-        fileUrl: `file://${fileInfo.sourcePath}`,
-      }));
-
-      const batchUploadResult = await proxyPost(
-        "/api/self/v1/upload-batch",
-        {
-          sessionId: sessionId,
-          files: batchFiles,
-        }
-      );
-
-      if (batchUploadResult.status === 200) {
-        const result = batchUploadResult.data?.result;
-        if (result?.results) {
-          progress = progress.map((p) => {
-            const uploadResult = result.results.find((r: any) => r.fileId === p.fileId);
-            if (uploadResult?.success) {
-              return { ...p, status: 'done' };
-            } else {
-              return { ...p, status: 'error', error: uploadResult?.error || 'Upload failed' };
-            }
-          });
-        } else {
-          progress = progress.map((p) => ({ ...p, status: 'done' }));
-        }
-        setUploadProgress(progress);
-        
-        toaster.toast({
-          title: "Upload complete",
-          body: `Successfully uploaded ${selectedFiles.length} file(s)`,
-        });
-        // Clear files after successful upload
-        clearFiles();
-      } else if (batchUploadResult.status === 207) {
-        const result = batchUploadResult.data?.result;
-        if (result?.results) {
-          progress = progress.map((p) => {
-            const uploadResult = result.results.find((r: any) => r.fileId === p.fileId);
-            if (uploadResult?.success) {
-              return { ...p, status: 'done' };
-            } else {
-              return { ...p, status: 'error', error: uploadResult?.error || 'Upload failed' };
-            }
-          });
-        }
-        setUploadProgress(progress);
-
-        const successCount = result?.success || 0;
-        const failedCount = result?.failed || 0;
-        toaster.toast({
-          title: "Partial upload complete",
-          body: `Success: ${successCount}, Failed: ${failedCount}`,
-        });
-      } else {
-        throw new Error(batchUploadResult.data?.error || `Batch upload failed: ${batchUploadResult.status}`);
-      }
-    } catch (error) {
-      toaster.toast({
-        title: "Upload failed",
-        body: String(error),
-      });
-      setUploadProgress((prev) =>
-        prev.map((p) => ({ ...p, status: 'error', error: String(error) }))
-      );
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleClearFiles = () => {
-    // Use store's clearFiles method
-    clearFiles();
+  const { handleToggleBackend } = createBackendHandlers(setBackend);
+  
+  const { handleScan } = createDeviceHandlers(backend, setDevices, setLoading);
+  
+  const { handleFileSelect, handleFolderSelect } = createFileHandlers(addFile, uploading);
+  
+  const { handleUpload, handleClearFiles } = createUploadHandlers(
+    selectedDevice,
+    selectedFiles,
+    setUploading,
+    setUploadProgress,
+    clearFiles
+  );
+  
+  const { handleCheckNotifyStatus, handleViewUploadHistory, handleClearHistory } = createDevToolsHandlers();
+  
+  // Handle reset button
+  const handleReset = () => {
+    resetAll();
     setUploadProgress([]);
-  };
-
-  const handleCheckNotifyStatus = async () => {
-    try {
-      const status = await getNotifyServerStatus();
-      toaster.toast({
-        title: "Notification Server Status",
-        body: `Running: ${status.running}, Socket exists: ${status.socket_exists}`,
-      });
-    } catch (error) {
-      toaster.toast({
-        title: "Failed to get status",
-        body: String(error),
-      });
-    }
-  };
-
-  const handleViewUploadHistory = async () => {
-    try {
-      const sessions = await getUploadSessions();
-      if (sessions.length === 0) {
-        toaster.toast({
-          title: "Upload History",
-          body: "No upload records",
-        });
-      } else {
-        toaster.toast({
-          title: "Upload History",
-          body: `Total: ${sessions.length} files`,
-        });
-      }
-    } catch (error) {
-      toaster.toast({
-        title: "Failed to get history",
-        body: String(error),
-      });
-    }
-  };
-
-  const handleClearHistory = async () => {
-    try {
-      await clearUploadSessions();
-      toaster.toast({
-        title: "History Cleared",
-        body: "Upload history has been cleared",
-      });
-    } catch (error) {
-      toaster.toast({
-        title: "Failed to clear history",
-        body: String(error),
-      });
-    }
+    toaster.toast({
+      title: "Reset Complete",
+      body: "All data has been cleared",
+    });
   };
 
   return (
     <>
       <PanelSection title="LocalSend Backend">
         <PanelSectionRow>
-          <ButtonItem layout="below" onClick={handleStart}>
-            {backend.running ? "Backend Running" : "Start Backend"}
-          </ButtonItem>
-        </PanelSectionRow>
-        <PanelSectionRow>
-          <ButtonItem layout="below" onClick={handleStop}>
-            Stop Backend
-          </ButtonItem>
+          <ToggleField
+            label="Backend Status"
+            description={backend.running ? "Backend is running" : "Backend is stopped"}
+            checked={backend.running}
+            onChange={handleToggleBackend}
+          />
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleScan} disabled={loading}>
@@ -438,8 +152,39 @@ function Content() {
             <PanelSectionRow>
               <Focusable style={{ maxHeight: '150px', overflowY: 'auto' }}>
                 {selectedFiles.map((file) => (
-                  <div key={file.id} style={{ padding: '4px 0', fontSize: '12px' }}>
-                    {file.fileName}
+                  <div 
+                    key={file.id} 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      padding: '4px 0', 
+                      fontSize: '12px' 
+                    }}
+                  >
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {file.fileName}
+                    </span>
+                    <button
+                      onClick={() => removeFile(file.id)}
+                      disabled={uploading}
+                      style={{
+                        marginLeft: '8px',
+                        padding: '2px 6px',
+                        fontSize: '10px',
+                        backgroundColor: '#dc3545',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: uploading ? 'not-allowed' : 'pointer',
+                        opacity: uploading ? 0.5 : 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px'
+                      }}
+                    >
+                      <FaTimes size={10} />
+                    </button>
                   </div>
                 ))}
               </Focusable>
@@ -465,6 +210,13 @@ function Content() {
             </Field>
           </PanelSectionRow>
         )}
+      </PanelSection>
+      <PanelSection title="Settings">
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={handleReset}>
+            Reset All Data
+          </ButtonItem>
+        </PanelSectionRow>
       </PanelSection>
       <PanelSection title="Developer Tools">
         <PanelSectionRow>
@@ -496,44 +248,7 @@ function Content() {
   );
 };
 
-function DevicesPanel({ 
-  devices, 
-  selectedDevice, 
-  onSelectDevice 
-}: { 
-  devices: ScanDevice[]; 
-  selectedDevice: ScanDevice | null;
-  onSelectDevice: (device: ScanDevice) => void;
-}) {
-  return (
-    <PanelSection title="Available Devices">
-      {devices.length === 0 ? (
-        <PanelSectionRow>
-          <div>No devices</div>
-        </PanelSectionRow>
-      ) : (
-        devices.map((device, index) => (
-          <PanelSectionRow key={`${device.fingerprint ?? device.alias ?? "device"}-${index}`}>
-            <ButtonItem 
-              layout="below" 
-              onClick={() => onSelectDevice(device)}
-            >
-              <div>
-                <div style={{ fontWeight: 'bold' }}>
-                  {device.alias ?? "Unknown Device"}
-                  {selectedDevice?.fingerprint === device.fingerprint ? " (Selected)" : ""}
-                </div>
-                <div style={{ fontSize: '12px', opacity: 0.7 }}>
-                  {device.ip_address as string} - {device.deviceModel ?? "unknown"}
-                </div>
-              </div>
-            </ButtonItem>
-          </PanelSectionRow>
-        ))
-      )}
-    </PanelSection>
-  );
-};
+
 
 export default definePlugin(() => {
   const EmitEventListener = addEventListener("unix_socket_notification", (event: { title: string; message: string }) => {
@@ -541,6 +256,19 @@ export default definePlugin(() => {
       title: event.title,
       body: event.message,
     });
+  });
+
+  // Listen for text received events from backend
+  const TextReceivedListener = addEventListener("text_received", (event: { title: string; content: string; fileName: string }) => {
+    const modalResult = showModal(
+      <TextReceivedModal
+        title={event.title}
+        content={event.content}
+        fileName={event.fileName}
+        onClose={() => {}}
+        closeModal={() => modalResult.Close()}
+      />
+    );
   });
 
   return {
@@ -556,6 +284,7 @@ export default definePlugin(() => {
     onDismount() {
       console.log("Unloading");
       removeEventListener("unix_socket_notification", EmitEventListener);
+      removeEventListener("text_received", TextReceivedListener);
     },
   };
 });

@@ -161,6 +161,7 @@ class Plugin:
             title = notification.get('title', '')
             message = notification.get('message', '')
             notification_data = notification.get('data', {})
+            is_text_only = notification.get('isTextOnly', False)
             
             session_id = notification_data.get('sessionId', '')
             file_id = notification_data.get('fileId', '')
@@ -190,14 +191,43 @@ class Plugin:
                     'file_type': file_type,
                     'sha256': sha256,
                     'start_time': time.time(),
-                    'status': 'uploading'
+                    'status': 'uploading',
+                    'is_text_only': is_text_only
                 }
                 
             elif notification_type == 'upload_end':
                 decky.logger.info(f"✅ Upload completed: {file_name} (size: {file_size} bytes)")
                 decky.logger.info(f"   Session ID: {session_id}, SHA256: {sha256}")
                 
-                # Emit event to frontend
+                # Check if this is a text-only notification
+                if is_text_only:
+                    decky.logger.info(f"📝 Text-only notification detected")
+                    # Read text content from uploaded file
+                    try:
+                        # Problem in text only :P my bad.
+                        file_path = os.path.join(self.upload_dir,session_id)
+                        txt_files = [f for f in os.listdir(file_path) if f.endswith('.txt')]
+                        file_name = txt_files[0] if txt_files else ''
+                        if file_name and os.path.exists(os.path.join(file_path, file_name)):
+                            with open(os.path.join(file_path, file_name), 'r', encoding='utf-8') as f:
+                                text_content = f.read()
+                            
+                            # Send text content to frontend with special event type
+                            asyncio.run_coroutine_threadsafe(
+                                decky.emit("text_received", {
+                                    "title": title or "Text Received",
+                                    "content": text_content,
+                                    "fileName": file_name
+                                }),
+                                self.loop
+                            )
+                            decky.logger.info(f"📝 Text content sent to frontend: {len(text_content)} characters")
+                        else:
+                            decky.logger.warning(f"Text file not found: {file_path}")
+                    except Exception as e:
+                        decky.logger.error(f"Failed to read text content: {e}")
+                
+                # Emit regular upload completed event
                 self._emit_notification_safe(
                     "Upload Completed",
                     f"File upload completed: {file_name} (size: {file_size} bytes)"
@@ -341,10 +371,12 @@ class Plugin:
             decky.logger.error(f"Proxy request failed: {e}")
             return {"error": str(e)}, 500
 
+    # used in frontend to get data from backend.
     async def proxy_get(self, path: str):
         data, status = await self._proxy_request("GET", path)
         return {"data": data, "status": status}
 
+    # used in frontend to send data to backend.
     async def proxy_post(self, path: str, json_data: dict = None, body: bytes = None):
         kwargs = {}
         if json_data is not None:
@@ -356,6 +388,7 @@ class Plugin:
         data, status = await self._proxy_request("POST", path, **kwargs)
         return {"data": data, "status": status}
 
+    # used in frontend to get upload session records.
     async def get_upload_sessions(self):
         """Get upload session records"""
         sessions = []
@@ -369,12 +402,14 @@ class Plugin:
         sessions.sort(key=lambda x: x.get('start_time', 0), reverse=True)
         return sessions
     
+    # used in frontend to clear upload session records.
     async def clear_upload_sessions(self):
         """Clear upload session records"""
         self.upload_sessions.clear()
         decky.logger.info("Upload session records cleared")
         return {"success": True}
     
+    # used in frontend to get notification server status.
     async def get_notify_server_status(self):
         """Get notification server status"""
         is_running = self.notify_thread is not None and self.notify_thread.is_alive()
@@ -384,8 +419,8 @@ class Plugin:
             "socket_exists": os.path.exists(self.socket_path)
         }
 
+    # used in frontend to prepare folder upload.
     async def prepare_folder_upload(self, folder_path: str):
-        """Zip a folder for upload and return the archive path"""
         if not folder_path or not os.path.isdir(folder_path):
             return {"success": False, "error": "Invalid folder path"}
         
@@ -394,6 +429,7 @@ class Plugin:
         zip_name = f"{base_name}-{int(time.time())}.zip"
         zip_path = os.path.join(self.upload_dir, zip_name)
 
+        # make upload adaptative, TODO: remove zip compress
         try:
             with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
                 for root, _, files in os.walk(folder_path):
@@ -413,7 +449,9 @@ class Plugin:
         except Exception as e:
             decky.logger.error(f"Failed to zip folder: {e}")
             return {"success": False, "error": str(e)}
+    
 
+    # BASE decky python-backend.
     async def _main(self):
         self.loop = asyncio.get_event_loop()
         self._start_notify_server()

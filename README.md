@@ -2,8 +2,6 @@
 
 # decky-localsend
 
-**Language / 语言:** English | [简体中文](README-zh-CN.md)
-
 A Decky Loader plugin that brings LocalSend functionality to Steam Deck gaming mode.
 
 </div>
@@ -15,29 +13,6 @@ A Decky Loader plugin that brings LocalSend functionality to Steam Deck gaming m
 This is a Decky Loader plugin that enables LocalSend functionality on Steam Deck in gaming mode. It allows you to easily transfer files, screenshots, and text between your devices and Steam Deck without the hassle of setting up servers or typing IP addresses manually.
 
 The plugin implements the [LocalSend Protocol](https://github.com/localsend/protocol) v2.1, providing seamless cross-platform file sharing.
-
-## Features
-
-- ✅ LocalSend Protocol v2.1 implementation
-- ✅ File receiving in Steam Deck gaming mode
-- ✅ Automatic device discovery via UDP multicast
-- ✅ Secure file transfer with HTTPS support
-- ✅ Session management for file transfers
-- ✅ Real-time transfer notifications
-- ✅ Customizable upload directory
-- ✅ Built-in Go backend for optimal performance
-
-
-
-### Manual Installation
-
-1. Download the latest release from [GitHub Releases](https://github.com/moyoez/decky-localsend/releases)
-2. Extract the plugin to your Decky plugins directory:
-   ```bash
-   cd ~/homebrew/plugins
-   unzip decky-localsend.zip
-   ```
-3. Restart Decky Loader or reload plugins
 
 ## Usage
 
@@ -74,18 +49,13 @@ You can customize these settings through the plugin interface.
 
 ## TODO
 
-- [ ] File sending capability
+- [ ] Confortable way of sending files, e.g. choosing screenshot in steam game overview:P
 - [ ] Manual confirmation for receiving files
 - [ ] Transfer history
-- [ ] Custom notification sounds
-- [ ] Multiple file selection
-
+- [ ] Multiple file selection (maybe it cannnot support:())
+- [ ] i18n support.
 
 ## Acknowledgments
 
 - [LocalSend](https://localsend.org) - The original cross-platform file sharing application
 - [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) - Plugin loader for Steam Deck
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.

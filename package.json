@@ -1,6 +1,6 @@
 {
   "name": "decky-localsend",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Use Localsend in gaming mode.",
   "type": "module",
   "scripts": {
@@ -17,8 +17,8 @@
     "plugin",
     "localsend"
   ],
-  "author": "MoeMagicMango <i@lemonkoi.one>",
-  "license": "MIT",
+  "author": "MoeMagicMango",
+  "license": "BSD-3-Clause",
   "homepage": "https://github.com/moyoez/decky-localsend#readme",
   "devDependencies": {
     "@decky/rollup": "^1.0.2",

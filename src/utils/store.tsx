@@ -15,6 +15,8 @@ type FileInfo = {
   id: string;
   fileName: string;
   sourcePath: string;
+  // Optional text content for text-based files
+  textContent?: string;
 };
 
 // Store state interface
@@ -55,9 +57,17 @@ export const useLocalSendStore = create<LocalSendStore>((set) => ({
   setSelectedFiles: (files) => set({ selectedFiles: files }),
   
   addFile: (file) => set((state) => {
-    // Prevent duplicate files
-    if (state.selectedFiles.some((item) => item.sourcePath === file.sourcePath)) {
-      return state;
+    // Prevent duplicate files (check by sourcePath or textContent for text files)
+    if (file.textContent) {
+      // For text files, check if same text content already exists
+      if (state.selectedFiles.some((item) => item.textContent === file.textContent && item.fileName === file.fileName)) {
+        return state;
+      }
+    } else {
+      // For regular files, check by sourcePath
+      if (state.selectedFiles.some((item) => item.sourcePath === file.sourcePath)) {
+        return state;
+      }
     }
     return { selectedFiles: [...state.selectedFiles, file] };
   }),

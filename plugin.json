@@ -1,10 +1,10 @@
 {
   "name": "decky-localsend",
   "author": "MoeMagicMango",
-  "flags": ["localsend", "_root"],
+  "flags": ["localsend"],
   "api_version": 1,
   "publish": {
-    "tags": ["localsend", "root"],
+    "tags": ["localsend"],
     "description": "Use Localsend in gaming mode.",
     "image": "https://opengraph.githubassets.com/1/moyoez/decky-plugin-localsend"
   }
