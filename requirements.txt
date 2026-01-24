@@ -1,2 +1,0 @@
-# Python dependencies for decky-localsend
-requests>=2.32.3

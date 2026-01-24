@@ -7,8 +7,10 @@ import zipfile
 import socket
 import json
 import threading
+import ssl
+import urllib.request
+import urllib.error
 
-import requests
 from typing import Dict, Any
 
 py_modules_path = os.path.join(os.path.dirname(__file__), "py_modules")
@@ -16,8 +18,6 @@ if py_modules_path not in sys.path:
     sys.path.insert(0, py_modules_path)
 
 
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 import decky
 
 
@@ -462,23 +462,61 @@ class Plugin:
         except Exception as e:
             decky.logger.error(f"Failed to write config: {e}")
 
-    def _get_session(self):
-        session = requests.Session()
-        retry_strategy = Retry(
-            total=3,
-            backoff_factor=0.5,
-            status_forcelist=[500, 502, 503, 504]
-        )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
-        session.verify = False
-        try:
-            import urllib3
-            urllib3.disable_warnings()
-        except ImportError:
-            pass
-        return session
+    def _get_ssl_context(self):
+        """Create SSL context that ignores certificate verification"""
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+
+    def _do_request(self, method: str, url: str, data: bytes = None, headers: dict = None, max_retries: int = 3, backoff_factor: float = 0.5):
+        """Execute HTTP request with retry logic using urllib"""
+        retry_status_codes = {500, 502, 503, 504}
+        last_error = None
+        
+        req_headers = headers or {}
+        
+        for attempt in range(max_retries + 1):
+            try:
+                request = urllib.request.Request(url, data=data, headers=req_headers, method=method)
+                ctx = self._get_ssl_context()
+                
+                with urllib.request.urlopen(request, context=ctx, timeout=30) as response:
+                    response_data = response.read()
+                    status_code = response.status
+                    content_type = response.headers.get('Content-Type', '')
+                    
+                    return response_data, status_code, content_type
+                    
+            except urllib.error.HTTPError as e:
+                status_code = e.code
+                if status_code in retry_status_codes and attempt < max_retries:
+                    time.sleep(backoff_factor * (2 ** attempt))
+                    last_error = e
+                    continue
+                # Return error response
+                try:
+                    response_data = e.read()
+                except:
+                    response_data = b''
+                content_type = e.headers.get('Content-Type', '') if e.headers else ''
+                return response_data, status_code, content_type
+                
+            except urllib.error.URLError as e:
+                last_error = e
+                if attempt < max_retries:
+                    time.sleep(backoff_factor * (2 ** attempt))
+                    continue
+                raise
+                
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries:
+                    time.sleep(backoff_factor * (2 ** attempt))
+                    continue
+                raise
+        
+        raise last_error if last_error else Exception("Max retries exceeded")
 
     async def _proxy_request(self, method: str, path: str, **kwargs):
         if not self._is_running():
@@ -488,19 +526,36 @@ class Plugin:
 
         try:
             loop = asyncio.get_event_loop()
-            session = self._get_session()
-            response = await loop.run_in_executor(
+            
+            # Prepare request data and headers
+            data = None
+            headers = {}
+            
+            if 'json' in kwargs:
+                data = json.dumps(kwargs['json']).encode('utf-8')
+                headers['Content-Type'] = 'application/json'
+            elif 'data' in kwargs:
+                data = kwargs['data']
+                if isinstance(data, str):
+                    data = data.encode('utf-8')
+            
+            if 'headers' in kwargs:
+                headers.update(kwargs['headers'])
+            
+            response_data, status_code, content_type = await loop.run_in_executor(
                 None,
-                lambda: session.request(method, url, **kwargs)
+                lambda: self._do_request(method, url, data=data, headers=headers)
             )
 
-            content_type = response.headers.get('Content-Type', '')
             if 'application/json' in content_type:
-                data = response.json()
+                try:
+                    parsed_data = json.loads(response_data.decode('utf-8'))
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    parsed_data = response_data.decode('utf-8', errors='replace')
             else:
-                data = response.text
+                parsed_data = response_data.decode('utf-8', errors='replace')
 
-            return data, response.status_code
+            return parsed_data, status_code
         except Exception as e:
             decky.logger.error(f"Proxy request failed: {e}")
             return {"error": str(e)}, 500
