@@ -1,6 +1,0 @@
-[submodule "backend/localsend"]
-	path = backend/localsend
-	url = https://github.com/MoYoez/localsend-base-protocol-golang
-[submodule "localsend-base-protocol-golang"]
-	path = localsend-base-protocol-golang
-	url = https://github.com/MoYoez/localsend-base-protocol-golang

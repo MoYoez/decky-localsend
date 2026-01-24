@@ -13,7 +13,7 @@ build:
 	fi
 	mkdir -p "$(OUT_DIR)"
 	cd "$(SUBMODULE_DIR)" && \
-		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOPROXY=https://goproxy.cn,direct \
+		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 		go build -trimpath -ldflags "-s -w" -o "../$(OUT_DIR)/$(BINARY_NAME)" .
 
 clean:

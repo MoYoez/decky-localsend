@@ -6,6 +6,7 @@ import {
   Field,
   Focusable,
   ToggleField,
+  DropdownItem,
   showModal,  
 } from "@decky/ui";
 import {
@@ -24,7 +25,7 @@ import { TextReceivedModal } from "./components/TextReceivedModal";
 import type { BackendStatus } from "./types/backend";
 import type { UploadProgress } from "./types/upload";
 
-import { getBackendStatus } from "./functions/api";
+import { getBackendStatus, getNetworkInterfaceSetting, getNetworkInterfaces, setNetworkInterfaceSetting } from "./functions/api";
 import { createBackendHandlers } from "./functions/backendHandlers";
 import { createDeviceHandlers } from "./functions/deviceHandlers";
 import { createFileHandlers } from "./functions/fileHandlers";
@@ -53,6 +54,9 @@ function Content() {
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
   const [uploading, setUploading] = useState(false);
   const [showDevTools, setShowDevTools] = useState(false);
+  const [networkInterface, setNetworkInterface] = useState("");
+  const [applyingNetworkInterface, setApplyingNetworkInterface] = useState(false);
+  const [networkInterfaces, setNetworkInterfaces] = useState<{ name: string; ipv4: string[] }[]>([]);
 
   useEffect(() => {
     getBackendStatus().then(setBackend).catch((error) => {
@@ -61,6 +65,22 @@ function Content() {
         body: `${error}`,
       });
     });
+    getNetworkInterfaceSetting()
+      .then((result) => setNetworkInterface(result.interface ?? ""))
+      .catch((error) => {
+        toaster.toast({
+          title: "Failed to load network interface",
+          body: `${error}`,
+        });
+      });
+    getNetworkInterfaces()
+      .then((result) => setNetworkInterfaces(result.interfaces ?? []))
+      .catch((error) => {
+        toaster.toast({
+          title: "Failed to load interfaces",
+          body: `${error}`,
+        });
+      });
   }, []);
 
 
@@ -79,6 +99,33 @@ function Content() {
   );
   
   const { handleCheckNotifyStatus, handleViewUploadHistory, handleClearHistory } = createDevToolsHandlers();
+
+  const handleApplyNetworkInterface = async () => {
+    setApplyingNetworkInterface(true);
+    try {
+      const result = await setNetworkInterfaceSetting(networkInterface);
+      if (!result.success) {
+        throw new Error(result.error ?? "Unknown error");
+      }
+      setNetworkInterface(result.interface ?? "");
+      if (result.restarted) {
+        setBackend((prev) => ({ ...prev, running: result.running }));
+      }
+      toaster.toast({
+        title: "Network interface updated",
+        body: result.restarted
+          ? "Backend restarted to apply changes"
+          : "Saved. Restart backend to apply changes",
+      });
+    } catch (error) {
+      toaster.toast({
+        title: "Failed to update interface",
+        body: `${error}`,
+      });
+    } finally {
+      setApplyingNetworkInterface(false);
+    }
+  };
   
   // Handle reset button
   const handleReset = () => {
@@ -212,6 +259,42 @@ function Content() {
         )}
       </PanelSection>
       <PanelSection title="Settings">
+        <PanelSectionRow>
+          <DropdownItem
+            label="Network Interface"
+            description="Leave empty for default. Use * for all interfaces."
+            disabled={applyingNetworkInterface}
+            rgOptions={[
+              { data: "", label: "Default" },
+              { data: "*", label: "All Interfaces (*)" },
+              ...networkInterfaces.map((iface) => ({
+                data: iface.name,
+                label: iface.ipv4.length
+                  ? `${iface.name} (${iface.ipv4.join(", ")})`
+                  : iface.name,
+              })),
+            ]}
+            selectedOption={{
+              data: networkInterface,
+              label:
+                networkInterface === ""
+                  ? "Default"
+                  : networkInterface === "*"
+                  ? "All Interfaces (*)"
+                  : networkInterface,
+            }}
+            onChange={(option: { data: string }) => setNetworkInterface(option.data)}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            onClick={handleApplyNetworkInterface}
+            disabled={applyingNetworkInterface}
+          >
+            {applyingNetworkInterface ? "Applying..." : "Apply and Restart Backend"}
+          </ButtonItem>
+        </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleReset}>
             Reset All Data

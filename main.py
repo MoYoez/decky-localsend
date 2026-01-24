@@ -32,6 +32,8 @@ class Plugin:
         self.upload_dir = os.path.join(decky.DECKY_PLUGIN_RUNTIME_DIR, "uploads")
         self.binary_path = os.path.join(decky.DECKY_PLUGIN_DIR, "bin", "localsend-core")
         self.backend_url = f"{self.backend_protocol}://127.0.0.1:{self.backend_port}"
+        self.settings_path = os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "plugin-settings.json")
+        self.network_interface = ""
         
         # Unix Domain Socket notification server
         self.socket_path = "/tmp/localsend-notify.sock"
@@ -41,6 +43,33 @@ class Plugin:
         
         # Upload session tracking
         self.upload_sessions: Dict[str, Dict[str, Any]] = {}
+
+        self._load_settings()
+
+    def _load_settings(self):
+        """Load plugin settings from disk"""
+        try:
+            os.makedirs(decky.DECKY_PLUGIN_SETTINGS_DIR, exist_ok=True)
+            if os.path.exists(self.settings_path):
+                with open(self.settings_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                self.network_interface = str(data.get("network_interface", "")).strip()
+        except Exception as e:
+            decky.logger.warning(f"Failed to load settings: {e}")
+
+    def _save_settings(self):
+        """Persist plugin settings to disk"""
+        try:
+            os.makedirs(decky.DECKY_PLUGIN_SETTINGS_DIR, exist_ok=True)
+            with open(self.settings_path, "w", encoding="utf-8") as f:
+                json.dump(
+                    {"network_interface": self.network_interface},
+                    f,
+                    ensure_ascii=True,
+                    indent=2,
+                )
+        except Exception as e:
+            decky.logger.error(f"Failed to save settings: {e}")
 
     def _ensure_dirs(self):
         os.makedirs(decky.DECKY_PLUGIN_SETTINGS_DIR, exist_ok=True)
@@ -287,6 +316,8 @@ class Plugin:
             "-log",
             "prod",
         ]
+        if self.network_interface:
+            cmd.extend(["-useReferNetworkInterface", self.network_interface])
 
         self.process = subprocess.Popen(
             cmd,
@@ -371,6 +402,63 @@ class Plugin:
             decky.logger.error(f"Proxy request failed: {e}")
             return {"error": str(e)}, 500
 
+    async def _scan_other_network_interface(self):
+        """Scan other network interface"""
+        interface_name = getattr(self, "interface_name", None)
+        results = []
+
+        try:
+            interface_names = [name for _, name in socket.if_nameindex()]
+        except Exception as e:
+            decky.logger.error(f"Failed to list network interfaces: {e}")
+            return results
+
+        for name in interface_names:
+            if interface_name and name == interface_name:
+                continue
+
+            ipv4_addrs = self._get_interface_ipv4_addrs(name)
+            if not ipv4_addrs:
+                continue
+
+            results.append({
+                "name": name,
+                "ipv4": ipv4_addrs,
+            })
+
+        return results
+
+    def _get_interface_ipv4_addrs(self, interface_name: str):
+        """Get IPv4 addresses for a specific interface"""
+        addresses = set()
+
+        try:
+            output = subprocess.check_output(
+                ["ip", "-o", "-4", "addr", "show", "dev", interface_name],
+                text=True,
+            )
+            for line in output.splitlines():
+                parts = line.split()
+                if "inet" in parts:
+                    addr = parts[parts.index("inet") + 1].split("/")[0]
+                    addresses.add(addr)
+        except Exception:
+            try:
+                output = subprocess.check_output(
+                    ["ifconfig", interface_name],
+                    text=True,
+                )
+                for line in output.splitlines():
+                    line = line.strip()
+                    if line.startswith("inet "):
+                        addr = line.split()[1]
+                        addresses.add(addr)
+            except Exception:
+                return []
+
+        return [addr for addr in addresses if not addr.startswith("127.")]
+
+
     # used in frontend to get data from backend.
     async def proxy_get(self, path: str):
         data, status = await self._proxy_request("GET", path)
@@ -417,6 +505,57 @@ class Plugin:
             "running": is_running,
             "socket_path": self.socket_path,
             "socket_exists": os.path.exists(self.socket_path)
+        }
+
+    # used in frontend to get network interface setting.
+    async def get_network_interface_setting(self):
+        return {"interface": self.network_interface}
+
+    # used in frontend to list available network interfaces.
+    async def get_network_interfaces(self):
+        interfaces = []
+        try:
+            interface_names = [name for _, name in socket.if_nameindex()]
+        except Exception as e:
+            decky.logger.error(f"Failed to list network interfaces: {e}")
+            return {"interfaces": interfaces}
+
+        for name in sorted(interface_names):
+            ipv4_addrs = self._get_interface_ipv4_addrs(name)
+            interfaces.append({
+                "name": name,
+                "ipv4": ipv4_addrs,
+            })
+
+        return {"interfaces": interfaces}
+
+    # used in frontend to set network interface and restart backend if needed.
+    async def set_network_interface_setting(self, interface: str):
+        value = (interface or "").strip()
+        self.network_interface = value
+        self._save_settings()
+
+        restarted = False
+        try:
+            if self._is_running():
+                self._stop_backend()
+                self._start_backend()
+                restarted = True
+        except Exception as e:
+            decky.logger.error(f"Failed to restart backend: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "interface": self.network_interface,
+                "restarted": restarted,
+                "running": self._is_running(),
+            }
+
+        return {
+            "success": True,
+            "interface": self.network_interface,
+            "restarted": restarted,
+            "running": self._is_running(),
         }
 
     # used in frontend to prepare folder upload.
