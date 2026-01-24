@@ -18,7 +18,7 @@ import {
 import { useLocalSendStore } from "./utils/store";
 import { useEffect, useState } from "react";
 import { FaTimes } from "react-icons/fa";
-import LocalsendIcon from "./components/logo";
+import {FaEnvelope} from "react-icons/fa";
 import DevicesPanel from "./components/device";
 import { TextReceivedModal } from "./components/TextReceivedModal";
 import { ConfirmReceiveModal } from "./components/ConfirmReceiveModal";
@@ -607,7 +607,7 @@ export default definePlugin(() => {
     // The content of your plugin's menu
     content: <Content />,
     // The icon displayed in the plugin list
-    icon: <LocalsendIcon />,
+    icon: <FaEnvelope />,
     // The function triggered when your plugin unloads
     onDismount() {
       console.log("Unloading");
