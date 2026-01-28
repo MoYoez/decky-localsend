@@ -2,6 +2,8 @@
 
 # decky-localsend
 
+[ENGLISH](README.md) | [简体中文](README-ZH-CN.md)
+
 ![preview](.github/assets/preview.jpg)
 
 A Decky Loader plugin that brings LocalSend functionality to Steam Deck gaming mode.
@@ -52,12 +54,9 @@ You can customize these settings through the plugin interface.
 ## TODO
 
 - [ ] Confortable way of sending files, e.g. choosing screenshot in steam game overview:P
-- [ ] Manual confirmation for receiving files
 - [ ] Transfer history
-- [ ] Multiple file selection (maybe it cannnot support:())
-- [ ] i18n support.
 
 ## Acknowledgments
 
-- [LocalSend](https://localsend.org) - The original cross-platform file sharing application
-- [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) - Plugin loader for Steam Deck
+- [LocalSend](https://localsend.org)
+- [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader)
