@@ -22,6 +22,12 @@ export const getNotifyServerStatus = callable<
   { running: boolean; socket_path: string; socket_exists: boolean }
 >("get_notify_server_status");
 
+// Factory Reset API
+export const factoryReset = callable<
+  [],
+  { success: boolean; message?: string; error?: string }
+>("factory_reset");
+
 // Backend Config API
 export const getBackendConfig = callable<
   [],
@@ -29,6 +35,8 @@ export const getBackendConfig = callable<
     alias: string;
     download_folder: string;
     legacy_mode: boolean;
+    use_mixed_scan: boolean;
+    skip_notify: boolean;
     multicast_address: string;
     multicast_port: number;
     pin: string;
@@ -42,6 +50,8 @@ export const setBackendConfig = callable<
       alias: string;
       download_folder: string;
       legacy_mode: boolean;
+      use_mixed_scan: boolean;
+      skip_notify: boolean;
       multicast_address: string;
       multicast_port: number | string;
       pin: string;

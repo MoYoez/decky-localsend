@@ -6,6 +6,7 @@ import {
   Field,
   Focusable,
   ToggleField,
+  SliderField,
   showModal,
 } from "@decky/ui";
 import {
@@ -27,7 +28,43 @@ import { BasicInputBoxModal } from "./components/basicInputBoxModal";
 import type { BackendStatus } from "./types/backend";
 import type { UploadProgress } from "./types/upload";
 
-import { getBackendConfig, getBackendStatus, setBackendConfig } from "./functions/api";
+import { getBackendConfig, getBackendStatus, setBackendConfig, factoryReset } from "./functions/api";
+import { ConfirmModal } from "./components/ConfirmModal";
+
+// Scan Mode Enum
+enum ScanMode {
+  Mixed = 0,   // Mixed Scan (UDP + HTTP) - Default
+  Normal = 1,  // Normal Scan (UDP multicast)
+  HTTP = 2,    // HTTP Scan (legacy mode)
+}
+
+// Scan Mode Labels for SliderField
+const scanModeNotchLabels = [
+  { notchIndex: 0, label: "Mixed", value: 0 },
+  { notchIndex: 1, label: "Normal", value: 1 },
+  { notchIndex: 2, label: "HTTP", value: 2 },
+];
+
+// Convert config flags to ScanMode
+const configToScanMode = (legacyMode: boolean, useMixedScan: boolean): ScanMode => {
+  if (useMixedScan) return ScanMode.Mixed;
+  if (legacyMode) return ScanMode.HTTP;
+  return ScanMode.Normal;
+};
+
+// Convert ScanMode to config flags
+const scanModeToConfig = (mode: ScanMode): { legacy_mode: boolean; use_mixed_scan: boolean } => {
+  switch (mode) {
+    case ScanMode.Mixed:
+      return { legacy_mode: false, use_mixed_scan: true };
+    case ScanMode.Normal:
+      return { legacy_mode: false, use_mixed_scan: false };
+    case ScanMode.HTTP:
+      return { legacy_mode: true, use_mixed_scan: false };
+    default:
+      return { legacy_mode: false, use_mixed_scan: true }; // Default to Mixed
+  }
+};
 import { createBackendHandlers } from "./functions/backendHandlers";
 import { createDeviceHandlers } from "./functions/deviceHandlers";
 import { createFileHandlers } from "./functions/fileHandlers";
@@ -60,7 +97,8 @@ function Content() {
   const [showDevTools, setShowDevTools] = useState(false);
   const [configAlias, setConfigAlias] = useState("");
   const [downloadFolder, setDownloadFolder] = useState("");
-  const [legacyMode, setLegacyMode] = useState(false);
+  const [scanMode, setScanMode] = useState<ScanMode>(ScanMode.Mixed);
+  const [skipNotify, setSkipNotify] = useState(false);
   const [multicastAddress, setMulticastAddress] = useState("");
   const [multicastPort, setMulticastPort] = useState("");
   const [pin, setPin] = useState("");
@@ -78,7 +116,8 @@ function Content() {
       .then((result) => {
         setConfigAlias(result.alias ?? "");
         setDownloadFolder(result.download_folder ?? "");
-        setLegacyMode(!!result.legacy_mode);
+        setScanMode(configToScanMode(!!result.legacy_mode, !!result.use_mixed_scan));
+        setSkipNotify(!!result.skip_notify);
         setMulticastAddress(result.multicast_address ?? "");
         setMulticastPort(result.multicast_port ? String(result.multicast_port) : "");
         setPin(result.pin ?? "");
@@ -160,21 +199,43 @@ function Content() {
     });
   };
 
+  // Reload config from backend
+  const reloadConfig = async () => {
+    try {
+      const result = await getBackendConfig();
+      setConfigAlias(result.alias ?? "");
+      setDownloadFolder(result.download_folder ?? "");
+      setScanMode(configToScanMode(!!result.legacy_mode, !!result.use_mixed_scan));
+      setSkipNotify(!!result.skip_notify);
+      setMulticastAddress(result.multicast_address ?? "");
+      setMulticastPort(result.multicast_port ? String(result.multicast_port) : "");
+      setPin(result.pin ?? "");
+      setAutoSave(!!result.auto_save);
+    } catch (error) {
+      console.error("Failed to reload config:", error);
+    }
+  };
+
   // save config
   const saveConfig = async (updates: {
     alias?: string;
     download_folder?: string;
-    legacy_mode?: boolean;
+    scan_mode?: ScanMode;
+    skip_notify?: boolean;
     multicast_address?: string;
     multicast_port?: string;
     pin?: string;
     auto_save?: boolean;
   }) => {
     try {
+      const currentScanMode = updates.scan_mode ?? scanMode;
+      const scanModeFlags = scanModeToConfig(currentScanMode);
       const result = await setBackendConfig({
         alias: updates.alias ?? configAlias,
         download_folder: updates.download_folder ?? downloadFolder,
-        legacy_mode: updates.legacy_mode ?? legacyMode,
+        legacy_mode: scanModeFlags.legacy_mode,
+        use_mixed_scan: scanModeFlags.use_mixed_scan,
+        skip_notify: updates.skip_notify ?? skipNotify,
         multicast_address: updates.multicast_address ?? multicastAddress,
         multicast_port: updates.multicast_port ?? multicastPort,
         pin: updates.pin ?? pin,
@@ -183,6 +244,8 @@ function Content() {
       if (!result.success) {
         throw new Error(result.error ?? "Unknown error");
       }
+      // Reload config from backend to ensure UI is in sync
+      await reloadConfig();
       toaster.toast({
         title: "Config saved",
         body: result.restarted ? "Backend restarted" : "Restart backend to take effect",
@@ -240,9 +303,31 @@ function Content() {
     }
   };
 
-  const handleToggleLegacyMode = async (checked: boolean) => {
-    setLegacyMode(checked);
-    await saveConfig({ legacy_mode: checked });
+  const handleClearPin = () => {
+    const modal = showModal(
+      <ConfirmModal
+        title="Clear PIN"
+        message="Are you sure you want to clear the PIN?"
+        confirmText="Clear"
+        cancelText="Cancel"
+        onConfirm={async () => {
+          setPin("");
+          await saveConfig({ pin: "" });
+        }}
+        closeModal={() => modal.Close()}
+      />
+    );
+  };
+
+  const handleScanModeChange = async (value: number) => {
+    const mode = value as ScanMode;
+    setScanMode(mode);
+    await saveConfig({ scan_mode: mode });
+  };
+
+  const handleToggleSkipNotify = async (checked: boolean) => {
+    setSkipNotify(checked);
+    await saveConfig({ skip_notify: checked });
   };
 
   const handleToggleAutoSave = async (checked: boolean) => {
@@ -253,10 +338,13 @@ function Content() {
   const handleApplyConfig = async () => {
     setApplyingConfig(true);
     try {
+      const scanModeFlags = scanModeToConfig(scanMode);
       const result = await setBackendConfig({
         alias: configAlias,
         download_folder: downloadFolder,
-        legacy_mode: legacyMode,
+        legacy_mode: scanModeFlags.legacy_mode,
+        use_mixed_scan: scanModeFlags.use_mixed_scan,
+        skip_notify: skipNotify,
         multicast_address: multicastAddress,
         multicast_port: multicastPort,
         pin,
@@ -265,6 +353,8 @@ function Content() {
       if (!result.success) {
         throw new Error(result.error ?? "Unknown error");
       }
+      // Reload config from backend to ensure UI is in sync
+      await reloadConfig();
       toaster.toast({
         title: "Config updated",
         body: "Restart backend to take effect",
@@ -287,6 +377,50 @@ function Content() {
       title: "Reset Complete",
       body: "All data has been cleared",
     });
+  };
+
+  // Handle factory reset
+  const handleFactoryReset = () => {
+    const modal = showModal(
+      <ConfirmModal
+        title="Factory Reset"
+        message="Are you sure you want to reset all settings to default? This will delete all configuration files and stop the backend."
+        confirmText="Reset"
+        cancelText="Cancel"
+        onConfirm={async () => {
+          try {
+            const result = await factoryReset();
+            if (result.success) {
+              // Reset local state to defaults
+              setConfigAlias("");
+              setDownloadFolder("");
+              setScanMode(ScanMode.Normal);
+              setSkipNotify(false);
+              setMulticastAddress("");
+              setMulticastPort("");
+              setPin("");
+              setAutoSave(true);
+              setBackend({ running: false, url: "https://127.0.0.1:53317" });
+              resetAll();
+              setUploadProgress([]);
+              
+              toaster.toast({
+                title: "Factory Reset Complete",
+                body: "All settings have been reset to default",
+              });
+            } else {
+              throw new Error(result.error ?? "Unknown error");
+            }
+          } catch (error) {
+            toaster.toast({
+              title: "Factory Reset Failed",
+              body: String(error),
+            });
+          }
+        }}
+        closeModal={() => modal.Close()}
+      />
+    );
   };
 
   return (
@@ -462,11 +596,25 @@ function Content() {
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
+          <SliderField
+            label="Scan Mode"
+            description="Normal: UDP multicast | HTTP: Legacy scan | Mixed: UDP + HTTP"
+            value={scanMode}
+            min={0}
+            max={scanModeNotchLabels.length - 1}
+            notchCount={scanModeNotchLabels.length}
+            notchLabels={scanModeNotchLabels}
+            notchTicksVisible={true}
+            step={1}
+            onChange={handleScanModeChange}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
           <ToggleField
-            label="Legacy Mode"
-            description="Use legacy HTTP scan mode (scan every 30 seconds)"
-            checked={legacyMode}
-            onChange={handleToggleLegacyMode}
+            label="Skip Notify"
+            description="Skip notification when receiving files"
+            checked={skipNotify}
+            onChange={handleToggleSkipNotify}
           />
         </PanelSectionRow>
         <PanelSectionRow>
@@ -475,6 +623,11 @@ function Content() {
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleEditPin}>
             Edit PIN
+          </ButtonItem>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={handleClearPin} disabled={!pin}>
+            Clear PIN
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
@@ -495,6 +648,11 @@ function Content() {
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleReset}>
             Reset All Data
+          </ButtonItem>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={handleFactoryReset}>
+            Factory Reset
           </ButtonItem>
         </PanelSectionRow>
       </PanelSection>

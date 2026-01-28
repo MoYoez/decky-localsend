@@ -13,11 +13,6 @@ import urllib.error
 
 from typing import Dict, Any
 
-py_modules_path = os.path.join(os.path.dirname(__file__), "py_modules")
-if py_modules_path not in sys.path:
-    sys.path.insert(0, py_modules_path)
-
-
 import decky
 
 
@@ -33,9 +28,16 @@ class Plugin:
         self.binary_path = os.path.join(decky.DECKY_PLUGIN_DIR, "bin", "localsend-core")
         self.backend_url = f"{self.backend_protocol}://127.0.0.1:{self.backend_port}"
         self.settings_path = os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "plugin-settings.json")
+
+        # Scan Config
         self.legacy_mode = False
+        self.use_mixed_scan = True  # Default to Mixed mode
+        self.skip_notify = False
         self.multicast_address = "224.0.0.167"
         self.multicast_port = 53317
+
+
+        # Plugin Sets
         self.pin = ""
         self.auto_save = True
         
@@ -58,6 +60,8 @@ class Plugin:
                 with open(self.settings_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 self.legacy_mode = bool(data.get("legacy_mode", self.legacy_mode))
+                self.use_mixed_scan = bool(data.get("use_mixed_scan", self.use_mixed_scan))
+                self.skip_notify = bool(data.get("skip_notify", self.skip_notify))
                 self.multicast_address = str(data.get("multicast_address", self.multicast_address)).strip()
                 multicast_port = data.get("multicast_port", self.multicast_port)
                 try:
@@ -80,6 +84,8 @@ class Plugin:
                 json.dump(
                     {
                         "legacy_mode": self.legacy_mode,
+                        "use_mixed_scan": self.use_mixed_scan,
+                        "skip_notify": self.skip_notify,
                         "multicast_address": self.multicast_address,
                         "multicast_port": self.multicast_port,
                         "pin": self.pin,
@@ -344,6 +350,10 @@ class Plugin:
             cmd.extend(["-useMultcastPort", str(self.multicast_port)])
         if self.legacy_mode:
             cmd.append("-useLegacyMode")
+        if self.use_mixed_scan:
+            cmd.append("-useMixedScan")
+        if self.skip_notify:
+            cmd.append("-skipNotify")
         if self.pin:
             cmd.extend(["-usePin", self.pin])
         cmd.append(f"-useAutoSave={'true' if self.auto_save else 'false'}")
@@ -615,6 +625,8 @@ class Plugin:
             "alias": str(config.get("alias", "")).strip(),
             "download_folder": self.upload_dir,
             "legacy_mode": self.legacy_mode,
+            "use_mixed_scan": self.use_mixed_scan,
+            "skip_notify": self.skip_notify,
             "multicast_address": self.multicast_address,
             "multicast_port": self.multicast_port,
             "pin": self.pin,
@@ -625,6 +637,8 @@ class Plugin:
         alias = str(config.get("alias", "")).strip()
         download_folder = str(config.get("download_folder", "")).strip()
         legacy_mode = bool(config.get("legacy_mode", False))
+        use_mixed_scan = bool(config.get("use_mixed_scan", False))
+        skip_notify = bool(config.get("skip_notify", False))
         multicast_address = str(config.get("multicast_address", "")).strip()
         multicast_port_raw = config.get("multicast_port", 0)
         pin = str(config.get("pin", "")).strip()
@@ -636,6 +650,8 @@ class Plugin:
             self.upload_dir = download_folder
 
         self.legacy_mode = legacy_mode
+        self.use_mixed_scan = use_mixed_scan
+        self.skip_notify = skip_notify
         self.multicast_address = multicast_address
         try:
             self.multicast_port = int(multicast_port_raw or 0)
@@ -699,6 +715,42 @@ class Plugin:
             decky.logger.error(f"Failed to zip folder: {e}")
             return {"success": False, "error": str(e)}
     
+
+    async def factory_reset(self):
+        """Reset all settings to default and delete config files"""
+        try:
+            # Stop backend if running
+            if self._is_running():
+                self._stop_backend()
+            
+            # Delete plugin settings file
+            if os.path.exists(self.settings_path):
+                os.remove(self.settings_path)
+                decky.logger.info(f"Deleted settings file: {self.settings_path}")
+            
+            # Delete backend config file
+            if os.path.exists(self.config_path):
+                os.remove(self.config_path)
+                decky.logger.info(f"Deleted config file: {self.config_path}")
+            
+            # Reset instance variables to defaults
+            self.legacy_mode = False
+            self.use_mixed_scan = True  # Default to Mixed mode
+            self.skip_notify = False
+            self.multicast_address = "224.0.0.167"
+            self.multicast_port = 53317
+            self.pin = ""
+            self.auto_save = True
+            self.upload_dir = os.path.join(decky.DECKY_PLUGIN_RUNTIME_DIR, "uploads")
+            
+            # Clear upload sessions
+            self.upload_sessions.clear()
+            
+            decky.logger.info("Factory reset completed")
+            return {"success": True, "message": "Factory reset completed"}
+        except Exception as e:
+            decky.logger.error(f"Factory reset failed: {e}")
+            return {"success": False, "error": str(e)}
 
     # BASE decky python-backend.
     async def _main(self):
