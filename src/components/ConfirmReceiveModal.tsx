@@ -7,6 +7,7 @@ import {
   Focusable,
   ModalRoot,
 } from "@decky/ui";
+import { t } from "../i18n";
 
 interface ConfirmReceiveModalProps {
   title?: string;
@@ -18,7 +19,7 @@ interface ConfirmReceiveModalProps {
 }
 
 export const ConfirmReceiveModal = ({
-  title = "Confirm Receive",
+  title,
   from,
   fileCount,
   files,
@@ -32,10 +33,10 @@ export const ConfirmReceiveModal = ({
 
   return (
     <ModalRoot onCancel={() => handleConfirm(false)} closeModal={closeModal}>
-      <DialogHeader>{title}</DialogHeader>
+      <DialogHeader>{title || t("confirmReceive.title")}</DialogHeader>
       <DialogBody>
         <div style={{ marginBottom: "10px", fontSize: "12px", color: "#b8b6b4" }}>
-          Incoming files from <strong>{from || "Unknown"}</strong> ({fileCount} file(s))
+          {t("confirmReceive.from")}: <strong>{from || "Unknown"}</strong> ({fileCount} {t("common.files")})
         </div>
         {files.length > 0 && (
           <Focusable style={{ maxHeight: "240px", overflowY: "auto" }}>
@@ -49,8 +50,8 @@ export const ConfirmReceiveModal = ({
         )}
       </DialogBody>
       <DialogFooter>
-        <DialogButton onClick={() => handleConfirm(false)}>Reject</DialogButton>
-        <DialogButtonPrimary onClick={() => handleConfirm(true)}>Accept</DialogButtonPrimary>
+        <DialogButton onClick={() => handleConfirm(false)}>{t("confirmReceive.reject")}</DialogButton>
+        <DialogButtonPrimary onClick={() => handleConfirm(true)}>{t("confirmReceive.accept")}</DialogButtonPrimary>
       </DialogFooter>
     </ModalRoot>
   );

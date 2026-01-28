@@ -1,5 +1,4 @@
 import os
-import sys
 import asyncio
 import subprocess
 import time
@@ -339,6 +338,8 @@ class Plugin:
             self.binary_path,
             "-useConfigPath",
             self.config_path,
+            "-log",
+            "prod",
             "-useDefaultUploadFolder",
             self.upload_dir,
             "-useReferNetworkInterface",

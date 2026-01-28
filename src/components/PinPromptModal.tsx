@@ -9,6 +9,7 @@ import {
   TextField,
 } from "@decky/ui";
 import { useState } from "react";
+import { t } from "../i18n";
 
 interface PinPromptModalProps {
   title?: string;
@@ -50,9 +51,9 @@ export const PinPromptModal = ({
         </Field>
       </DialogBody>
       <DialogFooter>
-        <DialogButton onClick={handleCancel} style={{marginTop: "10px"}}>Cancel</DialogButton>
+        <DialogButton onClick={handleCancel} style={{marginTop: "10px"}}>{t("common.cancel")}</DialogButton>
         <DialogButtonPrimary onClick={handleSubmit} disabled={!pin.trim()}>
-          Submit
+          {t("common.confirm")}
         </DialogButtonPrimary>
       </DialogFooter>
     </ModalRoot>

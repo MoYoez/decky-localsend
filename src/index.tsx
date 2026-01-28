@@ -8,12 +8,14 @@ import {
   ToggleField,
   SliderField,
   showModal,
+  Router
 } from "@decky/ui";
 import {
   definePlugin,
   addEventListener,
   toaster,
   removeEventListener,
+  routerHook,
 } from "@decky/api"
 
 import { useLocalSendStore } from "./utils/store";
@@ -30,6 +32,8 @@ import type { UploadProgress } from "./types/upload";
 
 import { getBackendConfig, getBackendStatus, setBackendConfig, factoryReset } from "./functions/api";
 import { ConfirmModal } from "./components/ConfirmModal";
+import { About } from "./About";
+import { t } from "./i18n";
 
 // Scan Mode Enum
 enum ScanMode {
@@ -108,7 +112,7 @@ function Content() {
   useEffect(() => {
     getBackendStatus().then(setBackend).catch((error) => {
       toaster.toast({
-        title: "Failed to get backend status",
+        title: t("toast.failedGetBackendStatus"),
         body: `${error}`,
       });
     });
@@ -125,7 +129,7 @@ function Content() {
       })
       .catch((error) => {
         toaster.toast({
-          title: "Failed to load config",
+          title: t("toast.failedLoadConfig"),
           body: `${error}`,
         });
       });
@@ -156,7 +160,7 @@ function Content() {
       await saveConfig({ download_folder: newPath });
     } catch (error) {
       toaster.toast({
-        title: "Failed to select folder",
+        title: t("toast.failedSelectFolder"),
         body: String(error),
       });
     }
@@ -182,7 +186,7 @@ function Content() {
     });
 
   const handleAddText = async () => {
-    const value = await openInputModal("Send Text", "Enter text content");
+    const value = await openInputModal(t("modal.sendText"), t("modal.enterTextContent"));
     if (value === null) {
       return;
     }
@@ -194,8 +198,8 @@ function Content() {
       textContent: value,
     });
     toaster.toast({
-      title: "Text added",
-      body: "Ready to send as .txt",
+      title: t("upload.textAdded"),
+      body: t("upload.readyToSend"),
     });
   };
 
@@ -247,19 +251,19 @@ function Content() {
       // Reload config from backend to ensure UI is in sync
       await reloadConfig();
       toaster.toast({
-        title: "Config saved",
-        body: result.restarted ? "Backend restarted" : "Restart backend to take effect",
+        title: t("config.configSaved"),
+        body: result.restarted ? t("config.backendRestarted") : t("config.restartToTakeEffect"),
       });
     } catch (error) {
       toaster.toast({
-        title: "Failed to save config",
+        title: t("toast.failedSaveConfig"),
         body: `${error}`,
       });
     }
   };
 
   const handleEditAlias = async () => {
-    const value = await openInputModal("Alias", "Enter alias");
+    const value = await openInputModal(t("config.alias"), t("modal.enterAlias"));
     if (value !== null) {
       const newValue = value.trim();
       setConfigAlias(newValue);
@@ -268,7 +272,7 @@ function Content() {
   };
 
   const handleEditMulticastAddress = async () => {
-    const value = await openInputModal("Multicast Address", "Enter multicast address");
+    const value = await openInputModal(t("config.multicastAddress"), t("modal.enterMulticastAddress"));
     if (value !== null) {
       const newValue = value.trim();
       setMulticastAddress(newValue);
@@ -277,7 +281,7 @@ function Content() {
   };
 
   const handleEditDownloadFolder = async () => {
-    const value = await openInputModal("Download Folder", "Enter download folder path");
+    const value = await openInputModal(t("config.downloadFolder"), t("modal.enterDownloadFolder"));
     if (value !== null) {
       const newValue = value.trim();
       setDownloadFolder(newValue);
@@ -286,7 +290,7 @@ function Content() {
   };
 
   const handleEditMulticastPort = async () => {
-    const value = await openInputModal("Multicast Port", "Enter multicast port");
+    const value = await openInputModal(t("config.multicastPort"), t("modal.enterMulticastPort"));
     if (value !== null) {
       const newValue = value.trim();
       setMulticastPort(newValue);
@@ -295,7 +299,7 @@ function Content() {
   };
 
   const handleEditPin = async () => {
-    const value = await openInputModal("PIN", "Enter PIN");
+    const value = await openInputModal(t("config.pin"), t("modal.enterPin"));
     if (value !== null) {
       const newValue = value.trim();
       setPin(newValue);
@@ -306,10 +310,10 @@ function Content() {
   const handleClearPin = () => {
     const modal = showModal(
       <ConfirmModal
-        title="Clear PIN"
-        message="Are you sure you want to clear the PIN?"
-        confirmText="Clear"
-        cancelText="Cancel"
+        title={t("config.clearPinTitle")}
+        message={t("config.clearPinMessage")}
+        confirmText={t("common.clear")}
+        cancelText={t("common.cancel")}
         onConfirm={async () => {
           setPin("");
           await saveConfig({ pin: "" });
@@ -356,12 +360,12 @@ function Content() {
       // Reload config from backend to ensure UI is in sync
       await reloadConfig();
       toaster.toast({
-        title: "Config updated",
-        body: "Restart backend to take effect",
+        title: t("config.configUpdated"),
+        body: t("config.restartToTakeEffect"),
       });
     } catch (error) {
       toaster.toast({
-        title: "Failed to update config",
+        title: t("toast.failedUpdateConfig"),
         body: `${error}`,
       });
     } finally {
@@ -374,8 +378,8 @@ function Content() {
     resetAll();
     setUploadProgress([]);
     toaster.toast({
-      title: "Reset Complete",
-      body: "All data has been cleared",
+      title: t("settings.resetComplete"),
+      body: t("settings.allDataCleared"),
     });
   };
 
@@ -383,10 +387,10 @@ function Content() {
   const handleFactoryReset = () => {
     const modal = showModal(
       <ConfirmModal
-        title="Factory Reset"
-        message="Are you sure you want to reset all settings to default? This will delete all configuration files and stop the backend."
-        confirmText="Reset"
-        cancelText="Cancel"
+        title={t("settings.factoryResetTitle")}
+        message={t("settings.factoryResetMessage")}
+        confirmText={t("common.reset")}
+        cancelText={t("common.cancel")}
         onConfirm={async () => {
           try {
             const result = await factoryReset();
@@ -405,15 +409,15 @@ function Content() {
               setUploadProgress([]);
               
               toaster.toast({
-                title: "Factory Reset Complete",
-                body: "All settings have been reset to default",
+                title: t("settings.factoryResetComplete"),
+                body: t("settings.allSettingsReset"),
               });
             } else {
               throw new Error(result.error ?? "Unknown error");
             }
           } catch (error) {
             toaster.toast({
-              title: "Factory Reset Failed",
+              title: t("toast.factoryResetFailed"),
               body: String(error),
             });
           }
@@ -425,23 +429,23 @@ function Content() {
 
   return (
     <>
-      <PanelSection title="LocalSend Backend">
+      <PanelSection title={t("backend.title")}>
         <PanelSectionRow>
           <ToggleField
-            label="Backend Status"
-            description={backend.running ? "Backend is running" : "Backend is stopped"}
+            label={t("backend.status")}
+            description={backend.running ? t("backend.running") : t("backend.stopped")}
             checked={backend.running}
             onChange={handleToggleBackend}
           />
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleScan} disabled={loading}>
-            {loading ? "Scanning..." : "Scan Devices"}
+            {loading ? t("backend.scanning") : t("backend.scanDevices")}
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleScan} disabled={loading}>
-            Refresh Devices
+            {t("backend.refreshDevices")}
           </ButtonItem>
         </PanelSectionRow>
       </PanelSection>
@@ -450,25 +454,25 @@ function Content() {
         selectedDevice={selectedDevice}
         onSelectDevice={setSelectedDevice}
       />
-      <PanelSection title="File Upload">
+      <PanelSection title={t("upload.title")}>
         <PanelSectionRow>
-          <Field label="Selected Device">
-            {selectedDevice ? selectedDevice.alias : "None"}
+          <Field label={t("upload.selectedDevice")}>
+            {selectedDevice ? selectedDevice.alias : t("upload.none")}
           </Field>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleFileSelect} disabled={uploading}>
-            Choose File
+            {t("upload.chooseFile")}
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleFolderSelect} disabled={uploading}>
-            Choose Folder
+            {t("upload.chooseFolder")}
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleAddText} disabled={uploading}>
-            Add Text
+            {t("upload.addText")}
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
@@ -477,14 +481,14 @@ function Content() {
             onClick={handleUpload}
             disabled={uploading || !selectedDevice || selectedFiles.length === 0}
           >
-            {uploading ? "Uploading..." : "Confirm Send"}
+            {uploading ? t("upload.uploading") : t("upload.confirmSend")}
           </ButtonItem>
         </PanelSectionRow>
         {selectedFiles.length > 0 && (
           <>
             <PanelSectionRow>
-              <Field label="Selected Files">
-                {selectedFiles.length} file(s)
+              <Field label={t("upload.selectedFiles")}>
+                {selectedFiles.length} {t("common.files")}
               </Field>
             </PanelSectionRow>
             <PanelSectionRow>
@@ -529,14 +533,14 @@ function Content() {
             </PanelSectionRow>
             <PanelSectionRow>
               <ButtonItem layout="below" onClick={handleClearFiles} disabled={uploading}>
-                Clear Files
+                {t("upload.clearFiles")}
               </ButtonItem>
             </PanelSectionRow>
           </>
         )}
         {uploadProgress.length > 0 && (
           <PanelSectionRow>
-            <Field label="Upload Progress">
+            <Field label={t("upload.uploadProgress")}>
               <Focusable style={{ maxHeight: '150px', overflowY: 'auto' }}>
                 {uploadProgress.map((progress) => (
                   <div key={progress.fileId} style={{ padding: '4px 0', fontSize: '12px' }}>
@@ -549,56 +553,56 @@ function Content() {
           </PanelSectionRow>
         )}
       </PanelSection>
-      <PanelSection title="Configuration">
+      <PanelSection title={t("config.title")}>
         <PanelSectionRow>
-          <Field label="Alias">
-            {configAlias || "Default"}
+          <Field label={t("config.alias")}>
+            {configAlias || t("config.default")}
           </Field>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleEditAlias}>
-            Edit Alias
+            {t("config.editAlias")}
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
-          <Field label="Download Folder">
-            {downloadFolder || "Default"}
+          <Field label={t("config.downloadFolder")}>
+            {downloadFolder || t("config.default")}
           </Field>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleEditDownloadFolder}>
-            Edit Download Folder
+            {t("config.editDownloadFolder")}
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleChooseDownloadFolder}>
-            Choose Download Folder
+            {t("config.chooseDownloadFolder")}
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
-          <Field label="Multicast Address">
-            {multicastAddress || "Default"}
+          <Field label={t("config.multicastAddress")}>
+            {multicastAddress || t("config.default")}
           </Field>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleEditMulticastAddress}>
-            Edit Multicast Address
+            {t("config.editMulticastAddress")}
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
-          <Field label="Multicast Port">
-            {multicastPort || "Default"}
+          <Field label={t("config.multicastPort")}>
+            {multicastPort || t("config.default")}
           </Field>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleEditMulticastPort}>
-            Edit Multicast Port
+            {t("config.editMulticastPort")}
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
           <SliderField
-            label="Scan Mode"
-            description="Normal: UDP multicast | HTTP: Legacy scan | Mixed: UDP + HTTP"
+            label={t("config.scanMode")}
+            description={t("config.scanModeDesc")}
             value={scanMode}
             min={0}
             max={scanModeNotchLabels.length - 1}
@@ -611,76 +615,89 @@ function Content() {
         </PanelSectionRow>
         <PanelSectionRow>
           <ToggleField
-            label="Skip Notify"
-            description="Skip notification when receiving files"
+            label={t("config.skipNotify")}
+            description={t("config.skipNotifyDesc")}
             checked={skipNotify}
             onChange={handleToggleSkipNotify}
           />
         </PanelSectionRow>
         <PanelSectionRow>
-          <Field label="PIN">{pin ? "Configured" : "Not set"}</Field>
+          <Field label={t("config.pin")}>{pin ? t("config.pinConfigured") : t("config.pinNotSet")}</Field>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleEditPin}>
-            Edit PIN
+            {t("config.editPin")}
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleClearPin} disabled={!pin}>
-            Clear PIN
+            {t("config.clearPin")}
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
           <ToggleField
-            label="Auto Save"
-            description="If disabled, require confirmation before receiving"
+            label={t("config.autoSave")}
+            description={t("config.autoSaveDesc")}
             checked={autoSave}
             onChange={handleToggleAutoSave}
           />
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleApplyConfig} disabled={applyingConfig}>
-            APPLY
+            {t("config.apply")}
           </ButtonItem>
         </PanelSectionRow>
       </PanelSection>
-      <PanelSection title="Settings">
+      <PanelSection title={t("settings.title")}>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleReset}>
-            Reset All Data
+            {t("settings.resetAllData")}
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleFactoryReset}>
-            Factory Reset
+            {t("settings.factoryReset")}
           </ButtonItem>
         </PanelSectionRow>
       </PanelSection>
-      <PanelSection title="Developer Tools">
+      <PanelSection title={t("devTools.title")}>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={() => setShowDevTools(!showDevTools)}>
-            {showDevTools ? "Hide Tools" : "Show Tools"}
+            {showDevTools ? t("devTools.hideTools") : t("devTools.showTools")}
           </ButtonItem>
         </PanelSectionRow>
         {showDevTools && (
           <>
             <PanelSectionRow>
               <ButtonItem layout="below" onClick={handleCheckNotifyStatus}>
-                Check Notify Server
+                {t("devTools.checkNotifyServer")}
               </ButtonItem>
             </PanelSectionRow>
             <PanelSectionRow>
               <ButtonItem layout="below" onClick={handleViewUploadHistory}>
-                View Upload History
+                {t("devTools.viewUploadHistory")}
               </ButtonItem>
             </PanelSectionRow>
             <PanelSectionRow>
               <ButtonItem layout="below" onClick={handleClearHistory}>
-                Clear History
+                {t("devTools.clearHistory")}
               </ButtonItem>
             </PanelSectionRow>
           </>
         )}
+      </PanelSection>
+      <PanelSection title={t("about.title")}>
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            onClick={() => {
+              Router.CloseSideMenus();
+              Router.Navigate("/decky-localsend-about");
+            }}
+          >
+            {t("about.aboutPlugin")}
+          </ButtonItem>
+        </PanelSectionRow>
       </PanelSection>
     </>
   );
@@ -689,6 +706,9 @@ function Content() {
 
 
 export default definePlugin(() => {
+  // Register About page route
+  routerHook.addRoute("/decky-localsend-about", About, { exact: true });
+
   const EmitEventListener = addEventListener("unix_socket_notification", (event: { type?: string; title?: string; message?: string; data?: any }) => {
     if (event.type === "confirm_recv") {
       const data = event.data ?? {};
@@ -701,8 +721,8 @@ export default definePlugin(() => {
           onConfirm={async (confirmed) => {
             if (!sessionId) {
               toaster.toast({
-                title: "Confirm failed",
-                body: "Missing sessionId",
+                title: t("toast.confirmFailed"),
+                body: t("toast.missingSessionId"),
               });
               return;
             }
@@ -714,12 +734,12 @@ export default definePlugin(() => {
                 throw new Error(result.data?.error || "Confirm request failed");
               }
               toaster.toast({
-                title: confirmed ? "Accepted" : "Rejected",
-                body: confirmed ? "Receive confirmed" : "Receive rejected",
+                title: confirmed ? t("toast.accepted") : t("toast.rejected"),
+                body: confirmed ? t("toast.receiveConfirmed") : t("toast.receiveRejected"),
               });
             } catch (error) {
               toaster.toast({
-                title: "Confirm failed",
+                title: t("toast.confirmFailed"),
                 body: String(error),
               });
             }
@@ -732,14 +752,14 @@ export default definePlugin(() => {
 
     if (event.type === "pin_required") {
       toaster.toast({
-        title: event.title || "PIN Required",
-        body: event.message || "PIN required for incoming files",
+        title: event.title || t("toast.pinRequired"),
+        body: event.message || t("toast.pinRequiredForFiles"),
       });
       return;
     }
 
     toaster.toast({
-      title: event.title || "Notification",
+      title: event.title || t("toast.notification"),
       body: event.message || "",
     });
   });
@@ -771,6 +791,7 @@ export default definePlugin(() => {
       console.log("Unloading");
       removeEventListener("unix_socket_notification", EmitEventListener);
       removeEventListener("text_received", TextReceivedListener);
+      routerHook.removeRoute("/decky-localsend-about");
     },
   };
 });

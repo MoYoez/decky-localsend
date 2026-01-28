@@ -9,6 +9,7 @@ import {
 } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { copyToClipboard } from "../utils/copyClipBoard";
+import { t } from "../i18n";
 
 interface TextReceivedModalProps {
   title: string;
@@ -35,15 +36,15 @@ export const TextReceivedModal = ({
     
     if (success) {
       toaster.toast({
-        title: "Copied",
-        body: "Text copied to clipboard successfully",
+        title: t("textReceived.copied"),
+        body: "",
       });
       closeModal?.();
       onClose();
     } else {
       toaster.toast({
-        title: "Copy Failed",
-        body: "Failed to copy text to clipboard",
+        title: t("common.failed"),
+        body: "",
       });
     }
   };
@@ -69,26 +70,18 @@ export const TextReceivedModal = ({
               fontSize: '12px', 
               marginBottom: '5px' 
             }}>
-              <strong>File Name:</strong> {fileName}
+              <strong>{fileName}</strong>
             </div>
             <div style={{ 
               color: '#b8b6b4', 
               fontSize: '12px' 
             }}>
-              <strong>Content Length:</strong> {content.length} characters
+              {content.length} characters
             </div>
           </div>
 
           {/* Content preview */}
           <div style={{ marginBottom: '10px' }}>
-            <div style={{ 
-              color: '#b8b6b4', 
-              fontSize: '12px', 
-              marginBottom: '5px',
-              fontWeight: 'bold'
-            }}>
-              Text Content:
-            </div>
             <div style={{
               padding: '12px',
               backgroundColor: '#0e0e0e',
@@ -106,27 +99,14 @@ export const TextReceivedModal = ({
               {content}
             </div>
           </div>
-
-          {/* Hint text */}
-          <div style={{
-            padding: '8px',
-            backgroundColor: '#1a2332',
-            border: '1px solid #2a4a6a',
-            borderRadius: '4px',
-            fontSize: '11px',
-            color: '#8ab4f8',
-            textAlign: 'center',
-          }}>
-            Click "Copy to Clipboard" to copy the text content
-          </div>
         </Focusable>
       </DialogBody>
       <DialogFooter>
         <DialogButton onClick={handleClose}>
-          Close
+          {t("textReceived.close")}
         </DialogButton>
         <DialogButtonPrimary onClick={handleCopyToClipboard}>
-          Copy to Clipboard
+          {t("textReceived.copyToClipboard")}
         </DialogButtonPrimary>
       </DialogFooter>
     </ModalRoot>

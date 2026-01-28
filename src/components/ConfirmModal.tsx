@@ -6,6 +6,7 @@ import {
   DialogHeader,
   ModalRoot,
 } from "@decky/ui";
+import { t } from "../i18n";
 
 interface ConfirmModalProps {
   title: string;
@@ -20,8 +21,8 @@ interface ConfirmModalProps {
 export const ConfirmModal = ({
   title,
   message,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
+  confirmText = t("common.confirm"),
+  cancelText = t("common.cancel"),
   onConfirm,
   onCancel,
   closeModal,
