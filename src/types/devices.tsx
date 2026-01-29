@@ -8,5 +8,12 @@
     port?: number;
     protocol?: string;
   };
+
+  type NetworkInfo = {
+    interface_name: string;
+    ip_address: string;
+    number: string;
+    number_int: number;
+  };
   
-export type { ScanDevice };
+export type { ScanDevice, NetworkInfo };

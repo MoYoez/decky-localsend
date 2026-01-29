@@ -13,6 +13,15 @@ export const en = {
     selected: "Selected",
   },
 
+  // Network Info Section
+  networkInfo: {
+    title: "Info",
+    number: "Number",
+    ipAddress: "IP Address",
+    multicastPort: "Multicast Port",
+    noNetwork: "No network info",
+  },
+
   // File Upload Section
   upload: {
     title: "File Upload",

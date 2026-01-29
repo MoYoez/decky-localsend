@@ -15,6 +15,15 @@ export const zhCN: TranslationKeys = {
     selected: "已选中",
   },
 
+  // Network Info Section
+  networkInfo: {
+    title: "信息",
+    number: "编号",
+    ipAddress: "IP 地址",
+    multicastPort: "多播端口",
+    noNetwork: "无网络信息",
+  },
+
   // File Upload Section
   upload: {
     title: "文件上传",

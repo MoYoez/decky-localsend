@@ -30,6 +30,7 @@ import { BasicInputBoxModal } from "./components/basicInputBoxModal";
 
 import type { BackendStatus } from "./types/backend";
 import type { UploadProgress } from "./types/upload";
+import type { NetworkInfo } from "./types/devices";
 
 import { getBackendConfig, getBackendStatus, setBackendConfig, factoryReset } from "./functions/api";
 import { ConfirmModal } from "./components/ConfirmModal";
@@ -77,7 +78,6 @@ import { createUploadHandlers } from "./functions/uploadHandlers";
 import { createDevToolsHandlers } from "./functions/devToolsHandlers";
 import { proxyGet } from "./utils/proxyReq";
 import { openFolder } from "./utils/openFolder";
-// import { createTextHandlers } from "./functions/textHandlers"; // Reserved for future direct text sending
 
 function Content() {
 
@@ -110,6 +110,27 @@ function Content() {
   const [autoSave, setAutoSave] = useState(true);
   const [useHttps, setUseHttps] = useState(true);
   const [notifyOnDownload, setNotifyOnDownload] = useState(false);
+  const [networkInfo, setNetworkInfo] = useState<NetworkInfo[]>([]);
+
+  // Fetch network info when backend is running
+  const fetchNetworkInfo = async () => {
+    if (!backend.running) {
+      setNetworkInfo([]);
+      return;
+    }
+    try {
+      const result = await proxyGet("/api/self/v1/get-network-info");
+      if (result.status === 200 && result.data?.data) {
+        // Filter out tun interfaces
+        const filtered = (result.data.data as NetworkInfo[]).filter(
+          (info) => !info.interface_name.startsWith("tun")
+        );
+        setNetworkInfo(filtered);
+      }
+    } catch (error) {
+      console.error("Failed to fetch network info:", error);
+    }
+  };
 
   useEffect(() => {
     getBackendStatus().then(setBackend).catch((error) => {
@@ -138,6 +159,11 @@ function Content() {
         });
       });
   }, []);
+
+  // Fetch network info when backend status changes
+  useEffect(() => {
+    fetchNetworkInfo();
+  }, [backend.running]);
 
 
   const { handleToggleBackend } = createBackendHandlers(setBackend);
@@ -420,6 +446,26 @@ function Content() {
           <ButtonItem layout="below" onClick={handleScan} disabled={loading}>
             {loading ? t("backend.scanning") : t("backend.scanDevices")}
           </ButtonItem>
+        </PanelSectionRow>
+      </PanelSection>
+      <PanelSection title={t("networkInfo.title")}>
+        {networkInfo.length === 0 ? (
+          <PanelSectionRow>
+            <div>{t("networkInfo.noNetwork")}</div>
+          </PanelSectionRow>
+        ) : (
+          networkInfo.map((info, index) => (
+            <PanelSectionRow key={`${info.interface_name}-${index}`}>
+              <Field label={info.number}>
+                {info.ip_address}
+              </Field>
+            </PanelSectionRow>
+          ))
+        )}
+        <PanelSectionRow>
+          <Field label={t("networkInfo.multicastPort")}>
+            {multicastPort || t("config.default")}
+          </Field>
         </PanelSectionRow>
       </PanelSection>
       <DevicesPanel 
