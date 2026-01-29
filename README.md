@@ -54,7 +54,7 @@ You can customize these settings through the plugin interface.
 ## TODO
 
 - [ ] Confortable way of sending files, e.g. choosing screenshot in steam game overview:P
-- [ ] Transfer history
+- [x] Transfer history
 
 ## Acknowledgments
 
