@@ -30,19 +30,22 @@ export const createUploadHandlers = (
     }
 
     setUploading(true);
+    
+    // Build progress display (folders show as single items)
     let progress: UploadProgress[] = selectedFiles.map((f) => ({
       fileId: f.id,
-      fileName: f.fileName,
+      fileName: f.isFolder ? `📁 ${f.fileName} (${f.fileCount} files)` : f.fileName,
       status: 'pending',
     }));
     setUploadProgress(progress);
 
     try {
-      // Separate text files and regular files
+      // Separate items by type
       const textFiles = selectedFiles.filter((f) => f.textContent);
-      const regularFiles = selectedFiles.filter((f) => !f.textContent);
+      const folderItems = selectedFiles.filter((f) => f.isFolder && f.folderPath);
+      const regularFiles = selectedFiles.filter((f) => !f.textContent && !f.isFolder);
 
-      // Prepare files map for prepare-upload
+      // Build files map for non-folder files
       const filesMap: Record<string, { id: string; fileUrl?: string; fileName?: string; size?: number; fileType?: string }> = {};
       
       // Add regular files with fileUrl
@@ -64,8 +67,29 @@ export const createUploadHandlers = (
         };
       });
 
+      // Determine if we're using folder upload mode
+      const hasFolders = folderItems.length > 0;
+      // For now, support single folder upload (use the first folder if multiple)
+      const folderPath = hasFolders ? folderItems[0].folderPath : null;
+      const hasExtraFiles = Object.keys(filesMap).length > 0;
+
       const prepareUpload = (pin?: string) => {
         const pinParam = pin ? `?pin=${encodeURIComponent(pin)}` : "";
+        
+        if (hasFolders && folderPath) {
+          // Mixed mode: folder + extra files
+          return proxyPost(
+            `/api/self/v1/prepare-upload${pinParam}`,
+            {
+              targetTo: selectedDevice.fingerprint,
+              useFolderUpload: true,
+              folderPath: folderPath,
+              ...(hasExtraFiles && { files: filesMap }),
+            }
+          );
+        }
+        
+        // Standard mode: only individual files
         return proxyPost(
           `/api/self/v1/prepare-upload${pinParam}`,
           {
@@ -93,7 +117,7 @@ export const createUploadHandlers = (
       progress = progress.map((p) => ({ ...p, status: 'uploading' }));
       setUploadProgress(progress);
 
-      // Upload text files individually
+      // Upload text files individually (text content needs special handling)
       for (const textFile of textFiles) {
         try {
           const textBytes = new TextEncoder().encode(textFile.textContent || "");
@@ -123,58 +147,102 @@ export const createUploadHandlers = (
         }
       }
 
-      // Upload regular files in batch
-      if (regularFiles.length > 0) {
-        const batchFiles = regularFiles.map((fileInfo) => ({
-          fileId: fileInfo.id,
-          token: tokens[fileInfo.id] || "",
-          fileUrl: `file://${fileInfo.sourcePath}`,
-        }));
+      // Upload folders and regular files
+      const hasFilesToUpload = hasFolders || regularFiles.length > 0;
+      
+      if (hasFilesToUpload) {
+        let batchUploadResult;
+        
+        if (hasFolders && folderPath) {
+          // Build extra files array for mixed upload
+          const extraFiles = regularFiles.map((fileInfo) => ({
+            fileId: fileInfo.id,
+            token: tokens[fileInfo.id] || "",
+            fileUrl: `file://${fileInfo.sourcePath}`,
+          }));
 
-        const batchUploadResult = await proxyPost(
-          "/api/self/v1/upload-batch",
-          {
-            sessionId: sessionId,
-            files: batchFiles,
-          }
-        );
+          batchUploadResult = await proxyPost(
+            "/api/self/v1/upload-batch",
+            {
+              sessionId: sessionId,
+              useFolderUpload: true,
+              folderPath: folderPath,
+              ...(extraFiles.length > 0 && { files: extraFiles }),
+            }
+          );
+        } else {
+          // Standard batch upload with individual files only
+          const batchFiles = regularFiles.map((fileInfo) => ({
+            fileId: fileInfo.id,
+            token: tokens[fileInfo.id] || "",
+            fileUrl: `file://${fileInfo.sourcePath}`,
+          }));
+
+          batchUploadResult = await proxyPost(
+            "/api/self/v1/upload-batch",
+            {
+              sessionId: sessionId,
+              files: batchFiles,
+            }
+          );
+        }
 
         if (batchUploadResult.status === 200) {
           const result = batchUploadResult.data?.result;
           if (result?.results) {
+            // Mark folder items as done if folder upload succeeded
+            if (hasFolders) {
+              progress = progress.map((p) => {
+                if (folderItems.some((f) => f.id === p.fileId)) {
+                  return { ...p, status: 'done' };
+                }
+                return p;
+              });
+            }
+            // Mark regular files based on results
             progress = progress.map((p) => {
               const uploadResult = result.results.find((r: any) => r.fileId === p.fileId);
               if (uploadResult?.success) {
                 return { ...p, status: 'done' };
-              } else {
+              } else if (uploadResult && !uploadResult.success) {
                 return { ...p, status: 'error', error: uploadResult?.error || 'Upload failed' };
               }
+              return p;
             });
           } else {
+            // No detailed results, mark all as done
             progress = progress.map((p) => {
-              // Only update regular files, text files already updated
-              if (regularFiles.some((f) => f.id === p.fileId)) {
+              if (folderItems.some((f) => f.id === p.fileId) || regularFiles.some((f) => f.id === p.fileId)) {
                 return { ...p, status: 'done' };
               }
               return p;
             });
           }
         } else if (batchUploadResult.status === 207) {
+          // Partial success
           const result = batchUploadResult.data?.result;
           if (result?.results) {
             progress = progress.map((p) => {
               const uploadResult = result.results.find((r: any) => r.fileId === p.fileId);
               if (uploadResult?.success) {
                 return { ...p, status: 'done' };
-              } else {
+              } else if (uploadResult) {
                 return { ...p, status: 'error', error: uploadResult?.error || 'Upload failed' };
               }
+              // For folder items without direct result match
+              if (folderItems.some((f) => f.id === p.fileId)) {
+                // Check overall success rate
+                if (result.success > 0) {
+                  return { ...p, status: 'done' };
+                }
+              }
+              return p;
             });
           }
         } else {
-          // Mark regular files as error
+          // All failed
           progress = progress.map((p) => {
-            if (regularFiles.some((f) => f.id === p.fileId)) {
+            if (folderItems.some((f) => f.id === p.fileId) || regularFiles.some((f) => f.id === p.fileId)) {
               return { ...p, status: 'error', error: batchUploadResult.data?.error || 'Upload failed' };
             }
             return p;
@@ -191,7 +259,7 @@ export const createUploadHandlers = (
       if (allDone) {
         toaster.toast({
           title: "Upload complete",
-          body: `Successfully uploaded ${selectedFiles.length} file(s)`,
+          body: `Successfully uploaded ${selectedFiles.length} item(s)`,
         });
         // Clear files after successful upload
         clearFiles();
@@ -217,7 +285,6 @@ export const createUploadHandlers = (
   };
 
   const handleClearFiles = () => {
-    // Use store's clearFiles method
     clearFiles();
     setUploadProgress([]);
   };

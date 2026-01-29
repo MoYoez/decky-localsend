@@ -2,7 +2,6 @@ import os
 import asyncio
 import subprocess
 import time
-import zipfile
 import socket
 import json
 import threading
@@ -39,6 +38,7 @@ class Plugin:
         self.auto_save = True
         self.use_https = True
         self.notify_on_download = False
+        self.save_receive_history = True  # New: save file receive history
         
         # Unix Domain Socket notification server
         self.socket_path = "/tmp/localsend-notify.sock"
@@ -48,8 +48,13 @@ class Plugin:
         
         # Upload session tracking
         self.upload_sessions: Dict[str, Dict[str, Any]] = {}
+        
+        # File receive history
+        self.receive_history_path = os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "receive-history.json")
+        self.receive_history: list = []
 
         self._load_settings()
+        self._load_receive_history()
 
     @property
     def backend_url(self) -> str:
@@ -77,11 +82,54 @@ class Plugin:
                 self.auto_save = bool(data.get("auto_save", self.auto_save))
                 self.use_https = bool(data.get("use_https", self.use_https))
                 self.notify_on_download = bool(data.get("notify_on_download", self.notify_on_download))
+                self.save_receive_history = bool(data.get("save_receive_history", self.save_receive_history))
                 upload_dir = str(data.get("download_folder", "")).strip()
                 if upload_dir:
                     self.upload_dir = upload_dir
         except Exception as e:
             decky.logger.warning(f"Failed to load settings: {e}")
+
+    def _load_receive_history(self):
+        """Load file receive history from disk"""
+        try:
+            if os.path.exists(self.receive_history_path):
+                with open(self.receive_history_path, "r", encoding="utf-8") as f:
+                    self.receive_history = json.load(f)
+                decky.logger.info(f"Loaded {len(self.receive_history)} receive history records")
+        except Exception as e:
+            decky.logger.warning(f"Failed to load receive history: {e}")
+            self.receive_history = []
+
+    def _save_receive_history(self):
+        """Persist file receive history to disk"""
+        try:
+            os.makedirs(decky.DECKY_PLUGIN_SETTINGS_DIR, exist_ok=True)
+            with open(self.receive_history_path, "w", encoding="utf-8") as f:
+                json.dump(self.receive_history, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            decky.logger.error(f"Failed to save receive history: {e}")
+
+    def _add_receive_history(self, folder_path: str, files: list, title: str = ""):
+        """Add a new entry to receive history"""
+        if not self.save_receive_history:
+            return
+        
+        entry = {
+            "id": f"recv-{int(time.time() * 1000)}-{len(self.receive_history)}",
+            "timestamp": time.time(),
+            "title": title or "File Received",
+            "folderPath": folder_path,
+            "fileCount": len(files),
+            "files": files,
+        }
+        self.receive_history.insert(0, entry)  # Insert at beginning (newest first)
+        
+        # Keep only last 100 records
+        if len(self.receive_history) > 100:
+            self.receive_history = self.receive_history[:100]
+        
+        self._save_receive_history()
+        decky.logger.info(f"Added receive history: {folder_path} ({len(files)} files)")
 
     def _save_settings(self):
         """Persist plugin settings to disk"""
@@ -99,6 +147,7 @@ class Plugin:
                         "auto_save": self.auto_save,
                         "use_https": self.use_https,
                         "notify_on_download": self.notify_on_download,
+                        "save_receive_history": self.save_receive_history,
                         "download_folder": self.upload_dir,
                     },
                     f,
@@ -319,23 +368,28 @@ class Plugin:
                     decky.logger.info(f"   Upload duration: {duration:.2f} seconds")
                 
                 # Send file received notification if enabled and not text-only
-                if self.notify_on_download and not is_text_only:
+                if not is_text_only:
                     try:
                         folder_path = os.path.join(self.upload_dir, session_id)
                         files_in_folder = []
                         if os.path.isdir(folder_path):
                             files_in_folder = os.listdir(folder_path)
                         
-                        asyncio.run_coroutine_threadsafe(
-                            decky.emit("file_received", {
-                                "title": title or "File Received",
-                                "folderPath": folder_path,
-                                "fileCount": len(files_in_folder),
-                                "files": files_in_folder
-                            }),
-                            self.loop
-                        )
-                        decky.logger.info(f"📁 File received notification sent: {folder_path}")
+                        # Save to receive history
+                        self._add_receive_history(folder_path, files_in_folder, title or "File Received")
+                        
+                        # Send notification if enabled
+                        if self.notify_on_download:
+                            asyncio.run_coroutine_threadsafe(
+                                decky.emit("file_received", {
+                                    "title": title or "File Received",
+                                    "folderPath": folder_path,
+                                    "fileCount": len(files_in_folder),
+                                    "files": files_in_folder
+                                }),
+                                self.loop
+                            )
+                            decky.logger.info(f"📁 File received notification sent: {folder_path}")
                     except Exception as e:
                         decky.logger.error(f"Failed to send file received notification: {e}")
                     
@@ -652,6 +706,28 @@ class Plugin:
             "socket_exists": os.path.exists(self.socket_path)
         }
 
+    # Receive history API
+    async def get_receive_history(self):
+        """Get file receive history"""
+        return self.receive_history
+
+    async def clear_receive_history(self):
+        """Clear file receive history"""
+        self.receive_history.clear()
+        self._save_receive_history()
+        decky.logger.info("Receive history cleared")
+        return {"success": True}
+
+    async def delete_receive_history_item(self, item_id: str):
+        """Delete a single receive history item"""
+        original_len = len(self.receive_history)
+        self.receive_history = [item for item in self.receive_history if item.get("id") != item_id]
+        if len(self.receive_history) < original_len:
+            self._save_receive_history()
+            decky.logger.info(f"Deleted receive history item: {item_id}")
+            return {"success": True}
+        return {"success": False, "error": "Item not found"}
+
     async def get_backend_config(self):
         config = self._read_config_yaml()
         return {
@@ -666,6 +742,7 @@ class Plugin:
             "auto_save": self.auto_save,
             "use_https": self.use_https,
             "notify_on_download": self.notify_on_download,
+            "save_receive_history": self.save_receive_history,
         }
 
     async def set_backend_config(self, config: dict):
@@ -680,6 +757,7 @@ class Plugin:
         auto_save = bool(config.get("auto_save", True))
         use_https = bool(config.get("use_https", True))
         notify_on_download = bool(config.get("notify_on_download", False))
+        save_receive_history = bool(config.get("save_receive_history", True))
 
         self._update_config_yaml({"alias": alias})
 
@@ -698,6 +776,7 @@ class Plugin:
         self.auto_save = auto_save
         self.use_https = use_https
         self.notify_on_download = notify_on_download
+        self.save_receive_history = save_receive_history
 
         self._save_settings()
         self._ensure_dirs()
@@ -723,36 +802,38 @@ class Plugin:
             "running": self._is_running(),
         }
 
-    # used in frontend to prepare folder upload.
-    async def prepare_folder_upload(self, folder_path: str):
+    # used in frontend to list all files in a folder recursively.
+    async def list_folder_files(self, folder_path: str):
+        """List all files in a folder recursively, returning their paths relative to the folder"""
         if not folder_path or not os.path.isdir(folder_path):
-            return {"success": False, "error": "Invalid folder path"}
+            return {"success": False, "error": "Invalid folder path", "files": []}
         
-        self._ensure_dirs()
-        base_name = os.path.basename(os.path.normpath(folder_path))
-        zip_name = f"{base_name}-{int(time.time())}.zip"
-        zip_path = os.path.join(self.upload_dir, zip_name)
-
-        # make upload adaptative, TODO: remove zip compress
         try:
-            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-                for root, _, files in os.walk(folder_path):
-                    for file in files:
-                        abs_path = os.path.join(root, file)
-                        rel_path = os.path.relpath(abs_path, folder_path)
-                        zipf.write(abs_path, arcname=os.path.join(base_name, rel_path))
-
-            size = os.path.getsize(zip_path)
+            files = []
+            base_name = os.path.basename(os.path.normpath(folder_path))
+            
+            for root, _, filenames in os.walk(folder_path):
+                for filename in filenames:
+                    abs_path = os.path.join(root, filename)
+                    rel_path = os.path.relpath(abs_path, folder_path)
+                    # Display path includes the folder name for clarity
+                    display_path = os.path.join(base_name, rel_path)
+                    
+                    files.append({
+                        "path": abs_path,
+                        "displayPath": display_path,
+                        "fileName": filename,
+                    })
+            
             return {
                 "success": True,
-                "path": zip_path,
-                "file_name": zip_name,
-                "size": size,
-                "file_type": "application/zip"
+                "files": files,
+                "folderName": base_name,
+                "count": len(files)
             }
         except Exception as e:
-            decky.logger.error(f"Failed to zip folder: {e}")
-            return {"success": False, "error": str(e)}
+            decky.logger.error(f"Failed to list folder files: {e}")
+            return {"success": False, "error": str(e), "files": []}
     
 
     async def factory_reset(self):
@@ -772,6 +853,11 @@ class Plugin:
                 os.remove(self.config_path)
                 decky.logger.info(f"Deleted config file: {self.config_path}")
             
+            # Delete receive history file
+            if os.path.exists(self.receive_history_path):
+                os.remove(self.receive_history_path)
+                decky.logger.info(f"Deleted receive history file: {self.receive_history_path}")
+            
             # Reset instance variables to defaults
             self.legacy_mode = False
             self.use_mixed_scan = True  # Default to Mixed mode
@@ -782,10 +868,12 @@ class Plugin:
             self.auto_save = True
             self.use_https = True
             self.notify_on_download = False
+            self.save_receive_history = True
             self.upload_dir = os.path.join(decky.DECKY_PLUGIN_RUNTIME_DIR, "uploads")
             
-            # Clear upload sessions
+            # Clear upload sessions and receive history
             self.upload_sessions.clear()
+            self.receive_history.clear()
             
             decky.logger.info("Factory reset completed")
             return {"success": True, "message": "Factory reset completed"}

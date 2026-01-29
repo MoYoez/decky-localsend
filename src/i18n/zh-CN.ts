@@ -39,6 +39,8 @@ export const zhCN: TranslationKeys = {
     uploadProgress: "上传进度",
     textAdded: "文本已添加",
     readyToSend: "准备以 .txt 发送",
+    folderAdded: "文件夹已添加",
+    folderFiles: "个文件",
   },
 
   // Configuration Section
@@ -74,6 +76,8 @@ export const zhCN: TranslationKeys = {
     useHttpsDesc: "启用加密连接 (HTTPS)。关闭后使用非加密连接 (HTTP)",
     notifyOnDownload: "下载完成后提示",
     notifyOnDownloadDesc: "文件下载完成后显示通知",
+    saveReceiveHistory: "保存接收历史",
+    saveReceiveHistoryDesc: "保存接收的文件历史记录以便后续查看",
     apply: "应用",
     configSaved: "配置已保存",
     backendRestarted: "后端已重启",
@@ -175,5 +179,23 @@ export const zhCN: TranslationKeys = {
     copyPath: "复制路径",
     pathCopied: "路径已复制！",
     close: "关闭",
+  },
+
+  // Receive History
+  receiveHistory: {
+    title: "接收历史",
+    loading: "加载中...",
+    refresh: "刷新",
+    empty: "暂无接收记录",
+    recordCount: "记录数",
+    clearAll: "清除全部",
+    clearAllTitle: "清除历史",
+    clearAllMessage: "确定要清除所有接收历史记录吗？",
+    cleared: "历史记录已清除",
+    disabled: "接收历史记录已关闭",
+    justNow: "刚刚",
+    minutesAgo: "分钟前",
+    hoursAgo: "小时前",
+    daysAgo: "天前",
   },
 };

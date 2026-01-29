@@ -37,6 +37,8 @@ export const en = {
     uploadProgress: "Upload Progress",
     textAdded: "Text added",
     readyToSend: "Ready to send as .txt",
+    folderAdded: "Folder added",
+    folderFiles: "files",
   },
 
   // Configuration Section
@@ -72,6 +74,8 @@ export const en = {
     useHttpsDesc: "Enable encrypted connection (HTTPS). Disable for unencrypted (HTTP)",
     notifyOnDownload: "Notify on Download Complete",
     notifyOnDownloadDesc: "Show notification when file download is complete",
+    saveReceiveHistory: "Save Receive History",
+    saveReceiveHistoryDesc: "Save received file history for later viewing",
     apply: "APPLY",
     configSaved: "Config saved",
     backendRestarted: "Backend restarted",
@@ -173,6 +177,24 @@ export const en = {
     copyPath: "Copy Path",
     pathCopied: "Path Copied!",
     close: "Close",
+  },
+
+  // Receive History
+  receiveHistory: {
+    title: "Receive History",
+    loading: "Loading...",
+    refresh: "Refresh",
+    empty: "No receive history",
+    recordCount: "Records",
+    clearAll: "Clear All",
+    clearAllTitle: "Clear History",
+    clearAllMessage: "Are you sure you want to clear all receive history?",
+    cleared: "History cleared",
+    disabled: "Receive history is disabled",
+    justNow: "Just now",
+    minutesAgo: "min ago",
+    hoursAgo: "hours ago",
+    daysAgo: "days ago",
   },
 };
 

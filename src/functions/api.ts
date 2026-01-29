@@ -7,10 +7,16 @@ export const stopBackend = callable<[], BackendStatus>("stop_backend");
 export const getBackendStatus = callable<[], BackendStatus>("get_backend_status");
 
 // File API
-export const prepareFolderUpload = callable<
+export const listFolderFiles = callable<
   [string],
-  { success: boolean; path?: string; file_name?: string; size?: number; file_type?: string; error?: string }
->("prepare_folder_upload");
+  {
+    success: boolean;
+    files: Array<{ path: string; displayPath: string; fileName: string }>;
+    folderName?: string;
+    count?: number;
+    error?: string;
+  }
+>("list_folder_files");
 
 // Upload Sessions API
 export const getUploadSessions = callable<[], any[]>("get_upload_sessions");
@@ -28,6 +34,25 @@ export const factoryReset = callable<
   { success: boolean; message?: string; error?: string }
 >("factory_reset");
 
+// Receive History API
+export interface ReceiveHistoryItem {
+  id: string;
+  timestamp: number;
+  title: string;
+  folderPath: string;
+  fileCount: number;
+  files: string[];
+}
+
+export const getReceiveHistory = callable<[], ReceiveHistoryItem[]>("get_receive_history");
+
+export const clearReceiveHistory = callable<[], { success: boolean }>("clear_receive_history");
+
+export const deleteReceiveHistoryItem = callable<
+  [string],
+  { success: boolean; error?: string }
+>("delete_receive_history_item");
+
 // Backend Config API
 export const getBackendConfig = callable<
   [],
@@ -43,6 +68,7 @@ export const getBackendConfig = callable<
     auto_save: boolean;
     use_https: boolean;
     notify_on_download: boolean;
+    save_receive_history: boolean;
   }
 >("get_backend_config");
 
@@ -60,6 +86,7 @@ export const setBackendConfig = callable<
       auto_save: boolean;
       use_https: boolean;
       notify_on_download: boolean;
+      save_receive_history: boolean;
     }
   ],
   { success: boolean; restarted: boolean; running: boolean; error?: string }

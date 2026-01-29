@@ -1,23 +1,12 @@
 import { toaster, openFilePicker, FileSelectionType } from "@decky/api";
 import fileOpener from "../utils/fileOpener";
-import { prepareFolderUpload } from "./api";
+import { listFolderFiles } from "./api";
 import type { FileInfo } from "../types/file";
 
 export const createFileHandlers = (
   addFile: (file: FileInfo) => void,
   uploading: boolean
 ) => {
-  const addFileFromPath = (realpath: string, displayPath?: string) => {
-    const fileName = (displayPath ?? realpath).split("/").pop() || "unknown";
-    const newFile: FileInfo = {
-      id: `file-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      fileName,
-      sourcePath: realpath,
-    };
-    // Use store's addFile method which handles duplicate checking
-    addFile(newFile);
-  };
-
   const handleFileSelect = async () => {
     if (uploading) return;
     try {
@@ -26,7 +15,15 @@ export const createFileHandlers = (
         "/home/deck"
       );
 
-      addFileFromPath(result.realpath ?? result.path, result.path);
+      const realpath = result.realpath ?? result.path;
+      const fileName = result.path.split("/").pop() || "unknown";
+      
+      const newFile: FileInfo = {
+        id: `file-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        fileName,
+        sourcePath: realpath,
+      };
+      addFile(newFile);
 
       toaster.toast({
         title: "File selected",
@@ -51,15 +48,28 @@ export const createFileHandlers = (
         true
       );
 
-      const zipResult = await prepareFolderUpload(result.path);
-      if (!zipResult.success || !zipResult.path) {
-        throw new Error(zipResult.error || "Failed to prepare folder");
+      // Get the real folder path
+      const folderPath = result.realpath ?? result.path;
+      
+      const folderResult = await listFolderFiles(folderPath);
+      if (!folderResult.success || folderResult.files.length === 0) {
+        throw new Error(folderResult.error || "Folder is empty or inaccessible");
       }
-      addFileFromPath(zipResult.path, zipResult.file_name ?? result.path);
+
+      // Add folder as a single item
+      const folderFile: FileInfo = {
+        id: `folder-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        fileName: folderResult.folderName || folderPath.split("/").pop() || "folder",
+        sourcePath: folderPath,
+        isFolder: true,
+        folderPath: folderPath,
+        fileCount: folderResult.count,
+      };
+      addFile(folderFile);
 
       toaster.toast({
         title: "Folder selected",
-        body: result.path,
+        body: `${folderResult.count} files from ${folderResult.folderName}`,
       });
     } catch (error) {
       toaster.toast({

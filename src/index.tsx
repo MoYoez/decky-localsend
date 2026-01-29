@@ -27,6 +27,7 @@ import { TextReceivedModal } from "./components/TextReceivedModal";
 import { ConfirmReceiveModal } from "./components/ConfirmReceiveModal";
 import { FileReceivedModal } from "./components/FileReceivedModal";
 import { BasicInputBoxModal } from "./components/basicInputBoxModal";
+import { ReceiveHistoryPanel } from "./components/ReceiveHistoryPanel";
 
 import type { BackendStatus } from "./types/backend";
 import type { UploadProgress } from "./types/upload";
@@ -110,6 +111,7 @@ function Content() {
   const [autoSave, setAutoSave] = useState(true);
   const [useHttps, setUseHttps] = useState(true);
   const [notifyOnDownload, setNotifyOnDownload] = useState(false);
+  const [saveReceiveHistory, setSaveReceiveHistory] = useState(true);
   const [networkInfo, setNetworkInfo] = useState<NetworkInfo[]>([]);
 
   // Fetch network info when backend is running
@@ -151,6 +153,7 @@ function Content() {
         setAutoSave(!!result.auto_save);
         setUseHttps(result.use_https !== false);
         setNotifyOnDownload(!!result.notify_on_download);
+        setSaveReceiveHistory(result.save_receive_history !== false);
       })
       .catch((error) => {
         toaster.toast({
@@ -247,6 +250,7 @@ function Content() {
       setAutoSave(!!result.auto_save);
       setUseHttps(result.use_https !== false);
       setNotifyOnDownload(!!result.notify_on_download);
+      setSaveReceiveHistory(result.save_receive_history !== false);
     } catch (error) {
       console.error("Failed to reload config:", error);
     }
@@ -264,6 +268,7 @@ function Content() {
     auto_save?: boolean;
     use_https?: boolean;
     notify_on_download?: boolean;
+    save_receive_history?: boolean;
   }) => {
     try {
       const currentScanMode = updates.scan_mode ?? scanMode;
@@ -280,6 +285,7 @@ function Content() {
         auto_save: updates.auto_save ?? autoSave,
         use_https: updates.use_https ?? useHttps,
         notify_on_download: updates.notify_on_download ?? notifyOnDownload,
+        save_receive_history: updates.save_receive_history ?? saveReceiveHistory,
       });
       if (!result.success) {
         throw new Error(result.error ?? "Unknown error");
@@ -384,6 +390,11 @@ function Content() {
     setNotifyOnDownload(checked);
     await saveConfig({ notify_on_download: checked });
   };
+
+  const handleToggleSaveReceiveHistory = async (checked: boolean) => {
+    setSaveReceiveHistory(checked);
+    await saveConfig({ save_receive_history: checked });
+  };
   
   // Handle factory reset
   const handleFactoryReset = () => {
@@ -408,6 +419,7 @@ function Content() {
               setAutoSave(true);
               setUseHttps(true);
               setNotifyOnDownload(false);
+              setSaveReceiveHistory(true);
               setBackend({ running: false, url: "https://127.0.0.1:53317" });
               resetAll();
               setUploadProgress([]);
@@ -524,7 +536,10 @@ function Content() {
                     }}
                   >
                     <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {file.fileName}
+                      {file.isFolder 
+                        ? `📁 ${file.fileName} (${file.fileCount} ${t("upload.folderFiles")})`
+                        : file.fileName
+                      }
                     </span>
                     <button
                       onClick={() => removeFile(file.id)}
@@ -677,7 +692,16 @@ function Content() {
             onChange={handleToggleNotifyOnDownload}
           />
         </PanelSectionRow>
+        <PanelSectionRow>
+          <ToggleField
+            label={t("config.saveReceiveHistory")}
+            description={t("config.saveReceiveHistoryDesc")}
+            checked={saveReceiveHistory}
+            onChange={handleToggleSaveReceiveHistory}
+          />
+        </PanelSectionRow>
       </PanelSection>
+      <ReceiveHistoryPanel saveReceiveHistory={saveReceiveHistory} />
       <PanelSection title={t("settings.title")}>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleFactoryReset}>

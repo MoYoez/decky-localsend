@@ -17,6 +17,10 @@ type FileInfo = {
   sourcePath: string;
   // Optional text content for text-based files
   textContent?: string;
+  // For folder items
+  isFolder?: boolean;
+  folderPath?: string;
+  fileCount?: number;
 };
 
 // Store state interface
@@ -29,7 +33,7 @@ interface LocalSendStore {
   selectedDevice: ScanDevice | null;
   setSelectedDevice: (device: ScanDevice | null) => void;
   
-  // Selected files state
+  // Selected files state (includes folders as items)
   selectedFiles: FileInfo[];
   setSelectedFiles: (files: FileInfo[]) => void;
   addFile: (file: FileInfo) => void;
@@ -57,15 +61,20 @@ export const useLocalSendStore = create<LocalSendStore>((set) => ({
   setSelectedFiles: (files) => set({ selectedFiles: files }),
   
   addFile: (file) => set((state) => {
-    // Prevent duplicate files (check by sourcePath or textContent for text files)
+    // Prevent duplicate files
     if (file.textContent) {
       // For text files, check if same text content already exists
       if (state.selectedFiles.some((item) => item.textContent === file.textContent && item.fileName === file.fileName)) {
         return state;
       }
+    } else if (file.isFolder && file.folderPath) {
+      // For folders, check by folderPath
+      if (state.selectedFiles.some((item) => item.isFolder && item.folderPath === file.folderPath)) {
+        return state;
+      }
     } else {
       // For regular files, check by sourcePath
-      if (state.selectedFiles.some((item) => item.sourcePath === file.sourcePath)) {
+      if (state.selectedFiles.some((item) => !item.isFolder && item.sourcePath === file.sourcePath)) {
         return state;
       }
     }
