@@ -59,4 +59,5 @@ You can customize these settings through the plugin interface.
 ## Acknowledgments
 
 - [LocalSend](https://localsend.org)
+> This Plugin is based on Localsend Protocol, so pls give a star to this!
 - [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader)
