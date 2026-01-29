@@ -42,6 +42,9 @@ export interface ReceiveHistoryItem {
   folderPath: string;
   fileCount: number;
   files: string[];
+  isText?: boolean;
+  textPreview?: string;
+  textContent?: string;
 }
 
 export const getReceiveHistory = callable<[], ReceiveHistoryItem[]>("get_receive_history");
@@ -69,6 +72,7 @@ export const getBackendConfig = callable<
     use_https: boolean;
     notify_on_download: boolean;
     save_receive_history: boolean;
+    enable_experimental: boolean;
   }
 >("get_backend_config");
 
@@ -87,6 +91,7 @@ export const setBackendConfig = callable<
       use_https: boolean;
       notify_on_download: boolean;
       save_receive_history: boolean;
+      enable_experimental: boolean;
     }
   ],
   { success: boolean; restarted: boolean; running: boolean; error?: string }

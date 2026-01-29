@@ -8,6 +8,8 @@ import threading
 import ssl
 import urllib.request
 import urllib.error
+import glob
+import base64
 
 from typing import Dict, Any
 
@@ -77,12 +79,13 @@ class Plugin:
                 try:
                     self.multicast_port = int(multicast_port or 0)
                 except (ValueError, TypeError):
-                    self.multicast_port = 0
+                    self.multicast_port = 53317
                 self.pin = str(data.get("pin", "")).strip()
                 self.auto_save = bool(data.get("auto_save", self.auto_save))
                 self.use_https = bool(data.get("use_https", self.use_https))
                 self.notify_on_download = bool(data.get("notify_on_download", self.notify_on_download))
                 self.save_receive_history = bool(data.get("save_receive_history", self.save_receive_history))
+                self.enable_experimental = bool(data.get("enable_experimental", False))
                 upload_dir = str(data.get("download_folder", "")).strip()
                 if upload_dir:
                     self.upload_dir = upload_dir
@@ -109,7 +112,7 @@ class Plugin:
         except Exception as e:
             decky.logger.error(f"Failed to save receive history: {e}")
 
-    def _add_receive_history(self, folder_path: str, files: list, title: str = ""):
+    def _add_receive_history(self, folder_path: str, files: list, title: str = "", is_text: bool = False, text_content: str = ""):
         """Add a new entry to receive history"""
         if not self.save_receive_history:
             return
@@ -117,11 +120,18 @@ class Plugin:
         entry = {
             "id": f"recv-{int(time.time() * 1000)}-{len(self.receive_history)}",
             "timestamp": time.time(),
-            "title": title or "File Received",
+            "title": title or ("Text Received" if is_text else "File Received"),
             "folderPath": folder_path,
             "fileCount": len(files),
             "files": files,
+            "isText": is_text,
         }
+        
+        # Add text content preview for text items (truncate if too long)
+        if is_text and text_content:
+            entry["textPreview"] = text_content[:200] + ("..." if len(text_content) > 200 else "")
+            entry["textContent"] = text_content
+        
         self.receive_history.insert(0, entry)  # Insert at beginning (newest first)
         
         # Keep only last 100 records
@@ -129,7 +139,10 @@ class Plugin:
             self.receive_history = self.receive_history[:100]
         
         self._save_receive_history()
-        decky.logger.info(f"Added receive history: {folder_path} ({len(files)} files)")
+        if is_text:
+            decky.logger.info(f"Added receive history (text): {len(text_content)} characters")
+        else:
+            decky.logger.info(f"Added receive history: {folder_path} ({len(files)} files)")
 
     def _save_settings(self):
         """Persist plugin settings to disk"""
@@ -148,6 +161,7 @@ class Plugin:
                         "use_https": self.use_https,
                         "notify_on_download": self.notify_on_download,
                         "save_receive_history": self.save_receive_history,
+                        "enable_experimental": self.enable_experimental,
                         "download_folder": self.upload_dir,
                     },
                     f,
@@ -338,17 +352,26 @@ class Plugin:
                         # Problem in text only :P my bad.
                         file_path = os.path.join(self.upload_dir,session_id)
                         txt_files = [f for f in os.listdir(file_path) if f.endswith('.txt')]
-                        file_name = txt_files[0] if txt_files else ''
-                        if file_name and os.path.exists(os.path.join(file_path, file_name)):
-                            with open(os.path.join(file_path, file_name), 'r', encoding='utf-8') as f:
+                        text_file_name = txt_files[0] if txt_files else ''
+                        if text_file_name and os.path.exists(os.path.join(file_path, text_file_name)):
+                            with open(os.path.join(file_path, text_file_name), 'r', encoding='utf-8') as f:
                                 text_content = f.read()
+                            
+                            # Save to receive history
+                            self._add_receive_history(
+                                folder_path=file_path,
+                                files=[text_file_name],
+                                title=title or "Text Received",
+                                is_text=True,
+                                text_content=text_content
+                            )
                             
                             # Send text content to frontend with special event type
                             asyncio.run_coroutine_threadsafe(
                                 decky.emit("text_received", {
                                     "title": title or "Text Received",
                                     "content": text_content,
-                                    "fileName": file_name
+                                    "fileName": text_file_name
                                 }),
                                 self.loop
                             )
@@ -649,6 +672,10 @@ class Plugin:
                     parsed_data = json.loads(response_data.decode('utf-8'))
                 except (json.JSONDecodeError, UnicodeDecodeError):
                     parsed_data = response_data.decode('utf-8', errors='replace')
+            elif 'image/' in content_type or 'application/octet-stream' in content_type:
+                # For binary data (images, etc.), return as base64
+
+                parsed_data = base64.b64encode(response_data).decode('utf-8')
             else:
                 parsed_data = response_data.decode('utf-8', errors='replace')
 
@@ -743,6 +770,7 @@ class Plugin:
             "use_https": self.use_https,
             "notify_on_download": self.notify_on_download,
             "save_receive_history": self.save_receive_history,
+            "enable_experimental": self.enable_experimental,
         }
 
     async def set_backend_config(self, config: dict):
@@ -758,6 +786,7 @@ class Plugin:
         use_https = bool(config.get("use_https", True))
         notify_on_download = bool(config.get("notify_on_download", False))
         save_receive_history = bool(config.get("save_receive_history", True))
+        enable_experimental = bool(config.get("enable_experimental", False))
 
         self._update_config_yaml({"alias": alias})
 
@@ -777,6 +806,7 @@ class Plugin:
         self.use_https = use_https
         self.notify_on_download = notify_on_download
         self.save_receive_history = save_receive_history
+        self.enable_experimental = enable_experimental
 
         self._save_settings()
         self._ensure_dirs()
@@ -880,6 +910,62 @@ class Plugin:
         except Exception as e:
             decky.logger.error(f"Factory reset failed: {e}")
             return {"success": False, "error": str(e)}
+
+
+
+    # EXPERIMENTAL: MAY BREAK STEAM TOS, be aware of risks.
+
+    async def get_steam_screenshots(self, limit: int = 50):
+        """Get Steam screenshots sorted by time"""
+        try:
+            screenshots = []
+            # Support multiple image formats
+            patterns = [
+                "~/.local/share/Steam/userdata/*/760/remote/*/screenshots/*.jpg",
+            ]
+            
+            for pattern in patterns:
+                expanded = os.path.expanduser(pattern)
+                files = glob.glob(expanded)
+                screenshots.extend(files)
+            
+            # Get file info and sort by modification time (newest first)
+            screenshot_info = []
+            for filepath in screenshots:
+                try:
+                    stat = os.stat(filepath)
+                    screenshot_info.append({
+                        "path": filepath,
+                        "filename": os.path.basename(filepath),
+                        "size": stat.st_size,
+                        "mtime": stat.st_mtime,
+                        "mtime_str": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime))
+                    })
+                except Exception as e:
+                    decky.logger.warning(f"Failed to get info for {filepath}: {e}")
+                    continue
+            
+            # Sort by modification time (newest first)
+            screenshot_info.sort(key=lambda x: x["mtime"], reverse=True)
+            
+            # Limit results
+            screenshot_info = screenshot_info[:limit]
+            
+            decky.logger.info(f"Found {len(screenshot_info)} screenshots")
+            return {
+                "success": True,
+                "screenshots": screenshot_info,
+                "count": len(screenshot_info)
+            }
+            
+        except Exception as e:
+            decky.logger.error(f"Failed to scan screenshots: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "screenshots": [],
+                "count": 0
+            }
 
     # BASE decky python-backend.
     async def _main(self):

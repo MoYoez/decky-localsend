@@ -8,7 +8,7 @@ import {
 } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
-import { FaTimes, FaFolder, FaSync } from "react-icons/fa";
+import { FaTimes, FaFolder, FaSync, FaFileAlt } from "react-icons/fa";
 import { 
   getReceiveHistory, 
   clearReceiveHistory, 
@@ -16,6 +16,7 @@ import {
   type ReceiveHistoryItem 
 } from "../functions/api";
 import { FileReceivedModal } from "./FileReceivedModal";
+import { TextReceivedModal } from "./TextReceivedModal";
 import { ConfirmModal } from "./ConfirmModal";
 import { t } from "../i18n";
 
@@ -93,16 +94,30 @@ export const ReceiveHistoryPanel = ({ saveReceiveHistory }: ReceiveHistoryPanelP
   };
 
   const handleViewItem = (item: ReceiveHistoryItem) => {
-    const modalResult = showModal(
-      <FileReceivedModal
-        title={item.title}
-        folderPath={item.folderPath}
-        fileCount={item.fileCount}
-        files={item.files}
-        onClose={() => {}}
-        closeModal={() => modalResult.Close()}
-      />
-    );
+    if (item.isText && item.textContent) {
+      // Show text modal for text items
+      const modalResult = showModal(
+        <TextReceivedModal
+          title={item.title}
+          content={item.textContent}
+          fileName={item.files[0] || "text.txt"}
+          onClose={() => {}}
+          closeModal={() => modalResult.Close()}
+        />
+      );
+    } else {
+      // Show file modal for file items
+      const modalResult = showModal(
+        <FileReceivedModal
+          title={item.title}
+          folderPath={item.folderPath}
+          fileCount={item.fileCount}
+          files={item.files}
+          onClose={() => {}}
+          closeModal={() => modalResult.Close()}
+        />
+      );
+    }
   };
 
   const formatTime = (timestamp: number) => {
@@ -185,14 +200,21 @@ export const ReceiveHistoryPanel = ({ saveReceiveHistory }: ReceiveHistoryPanelP
                       gap: '6px',
                       marginBottom: '2px'
                     }}>
-                      <FaFolder size={12} style={{ color: '#4a9eff' }} />
+                      {item.isText ? (
+                        <FaFileAlt size={12} style={{ color: '#ffa500' }} />
+                      ) : (
+                        <FaFolder size={12} style={{ color: '#4a9eff' }} />
+                      )}
                       <span style={{ 
                         fontWeight: 'bold',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
                       }}>
-                        {item.fileCount} {t("common.files")}
+                        {item.isText 
+                          ? (item.textPreview || t("receiveHistory.textReceived"))
+                          : `${item.fileCount} ${t("common.files")}`
+                        }
                       </span>
                     </div>
                     <div style={{ 

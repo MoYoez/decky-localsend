@@ -28,6 +28,7 @@ import { ConfirmReceiveModal } from "./components/ConfirmReceiveModal";
 import { FileReceivedModal } from "./components/FileReceivedModal";
 import { BasicInputBoxModal } from "./components/basicInputBoxModal";
 import { ReceiveHistoryPanel } from "./components/ReceiveHistoryPanel";
+import { ScreenshotGalleryModal } from "./components/ScreenshotGalleryModal";
 
 import type { BackendStatus } from "./types/backend";
 import type { UploadProgress } from "./types/upload";
@@ -76,7 +77,6 @@ import { createBackendHandlers } from "./functions/backendHandlers";
 import { createDeviceHandlers } from "./functions/deviceHandlers";
 import { createFileHandlers } from "./functions/fileHandlers";
 import { createUploadHandlers } from "./functions/uploadHandlers";
-import { createDevToolsHandlers } from "./functions/devToolsHandlers";
 import { proxyGet } from "./utils/proxyReq";
 import { openFolder } from "./utils/openFolder";
 
@@ -100,7 +100,6 @@ function Content() {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [showDevTools, setShowDevTools] = useState(false);
   const [configAlias, setConfigAlias] = useState("");
   const [downloadFolder, setDownloadFolder] = useState("");
   const [scanMode, setScanMode] = useState<ScanMode>(ScanMode.Mixed);
@@ -113,6 +112,7 @@ function Content() {
   const [notifyOnDownload, setNotifyOnDownload] = useState(false);
   const [saveReceiveHistory, setSaveReceiveHistory] = useState(true);
   const [networkInfo, setNetworkInfo] = useState<NetworkInfo[]>([]);
+  const [enableExperimental, setEnableExperimental] = useState(false);
 
   // Fetch network info when backend is running
   const fetchNetworkInfo = async () => {
@@ -154,6 +154,7 @@ function Content() {
         setUseHttps(result.use_https !== false);
         setNotifyOnDownload(!!result.notify_on_download);
         setSaveReceiveHistory(result.save_receive_history !== false);
+        setEnableExperimental(!!result.enable_experimental);
       })
       .catch((error) => {
         toaster.toast({
@@ -182,8 +183,6 @@ function Content() {
     setUploadProgress,
     clearFiles
   );
-  
-  const { handleCheckNotifyStatus, handleViewUploadHistory, handleClearHistory } = createDevToolsHandlers();
 
   const handleChooseDownloadFolder = async () => {
     try {
@@ -236,6 +235,44 @@ function Content() {
     });
   };
 
+  // Handle screenshot gallery (experimental)
+  const handleOpenScreenshotGallery = () => {
+    // Show warning modal first
+    const warningModal = showModal(
+      <ConfirmModal
+        title={t("screenshot.experimental")}
+        message={t("screenshot.warningDetails")}
+        confirmText={t("screenshot.understand")}
+        cancelText={t("common.cancel")}
+        onConfirm={() => {
+          // Open screenshot gallery
+          const galleryModal = showModal(
+            <ScreenshotGalleryModal
+              backendUrl={backend.url}
+              onSelectScreenshots={(screenshots) => {
+                // Add selected screenshots to upload queue
+                screenshots.forEach((screenshot) => {
+                  const now = Date.now();
+                  addFile({
+                    id: `screenshot-${now}-${Math.random().toString(16).slice(2)}`,
+                    fileName: screenshot.filename,
+                    sourcePath: screenshot.path,
+                  });
+                });
+                toaster.toast({
+                  title: t("screenshot.added"),
+                  body: `${screenshots.length} ${t("screenshot.screenshotsAdded")}`,
+                });
+              }}
+              closeModal={() => galleryModal.Close()}
+            />
+          );
+        }}
+        closeModal={() => warningModal.Close()}
+      />
+    );
+  };
+
   // Reload config from backend
   const reloadConfig = async () => {
     try {
@@ -251,6 +288,7 @@ function Content() {
       setUseHttps(result.use_https !== false);
       setNotifyOnDownload(!!result.notify_on_download);
       setSaveReceiveHistory(result.save_receive_history !== false);
+      setEnableExperimental(!!result.enable_experimental);
     } catch (error) {
       console.error("Failed to reload config:", error);
     }
@@ -269,6 +307,7 @@ function Content() {
     use_https?: boolean;
     notify_on_download?: boolean;
     save_receive_history?: boolean;
+    enable_experimental?: boolean;
   }) => {
     try {
       const currentScanMode = updates.scan_mode ?? scanMode;
@@ -286,6 +325,7 @@ function Content() {
         use_https: updates.use_https ?? useHttps,
         notify_on_download: updates.notify_on_download ?? notifyOnDownload,
         save_receive_history: updates.save_receive_history ?? saveReceiveHistory,
+        enable_experimental: updates.enable_experimental ?? enableExperimental,
       });
       if (!result.success) {
         throw new Error(result.error ?? "Unknown error");
@@ -395,6 +435,40 @@ function Content() {
     setSaveReceiveHistory(checked);
     await saveConfig({ save_receive_history: checked });
   };
+
+  const handleToggleExperimental = async (checked: boolean) => {
+    setEnableExperimental(checked);
+    // Save config without showing restart toast
+    try {
+      const currentScanMode = scanMode;
+      const scanModeFlags = scanModeToConfig(currentScanMode);
+      const result = await setBackendConfig({
+        alias: configAlias,
+        download_folder: downloadFolder,
+        legacy_mode: scanModeFlags.legacy_mode,
+        use_mixed_scan: scanModeFlags.use_mixed_scan,
+        skip_notify: skipNotify,
+        multicast_address: multicastAddress,
+        multicast_port: multicastPort,
+        pin: pin,
+        auto_save: autoSave,
+        use_https: useHttps,
+        notify_on_download: notifyOnDownload,
+        save_receive_history: saveReceiveHistory,
+        enable_experimental: checked,
+      });
+      if (!result.success) {
+        throw new Error(result.error ?? "Unknown error");
+      }
+      // Reload config from backend to ensure UI is in sync
+      await reloadConfig();
+    } catch (error) {
+      toaster.toast({
+        title: t("toast.failedSaveConfig"),
+        body: `${error}`,
+      });
+    }
+  };
   
   // Handle factory reset
   const handleFactoryReset = () => {
@@ -420,6 +494,7 @@ function Content() {
               setUseHttps(true);
               setNotifyOnDownload(false);
               setSaveReceiveHistory(true);
+              setEnableExperimental(false);
               setBackend({ running: false, url: "https://127.0.0.1:53317" });
               resetAll();
               setUploadProgress([]);
@@ -506,6 +581,17 @@ function Content() {
             {t("upload.addText")}
           </ButtonItem>
         </PanelSectionRow>
+        {enableExperimental && (
+          <PanelSectionRow>
+            <ButtonItem 
+              layout="below" 
+              onClick={handleOpenScreenshotGallery} 
+              disabled={uploading}
+            >
+              📷 {t("screenshot.openGallery")}
+            </ButtonItem>
+          </PanelSectionRow>
+        )}
         <PanelSectionRow>
           <ButtonItem
             layout="below"
@@ -587,6 +673,7 @@ function Content() {
           </PanelSectionRow>
         )}
       </PanelSection>
+      <ReceiveHistoryPanel saveReceiveHistory={saveReceiveHistory} />
       <PanelSection title={t("config.title")}>
         <PanelSectionRow>
           <Field label={t("config.alias")}>
@@ -700,40 +787,19 @@ function Content() {
             onChange={handleToggleSaveReceiveHistory}
           />
         </PanelSectionRow>
-      </PanelSection>
-      <ReceiveHistoryPanel saveReceiveHistory={saveReceiveHistory} />
-      <PanelSection title={t("settings.title")}>
+        <PanelSectionRow>
+          <ToggleField
+            label={t("screenshot.experimental")}
+            description={t("screenshot.warning")}
+            checked={enableExperimental}
+            onChange={handleToggleExperimental}
+          />
+        </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleFactoryReset}>
             {t("settings.resetAllData")}
           </ButtonItem>
         </PanelSectionRow>
-      </PanelSection>
-      <PanelSection title={t("devTools.title")}>
-        <PanelSectionRow>
-          <ButtonItem layout="below" onClick={() => setShowDevTools(!showDevTools)}>
-            {showDevTools ? t("devTools.hideTools") : t("devTools.showTools")}
-          </ButtonItem>
-        </PanelSectionRow>
-        {showDevTools && (
-          <>
-            <PanelSectionRow>
-              <ButtonItem layout="below" onClick={handleCheckNotifyStatus}>
-                {t("devTools.checkNotifyServer")}
-              </ButtonItem>
-            </PanelSectionRow>
-            <PanelSectionRow>
-              <ButtonItem layout="below" onClick={handleViewUploadHistory}>
-                {t("devTools.viewUploadHistory")}
-              </ButtonItem>
-            </PanelSectionRow>
-            <PanelSectionRow>
-              <ButtonItem layout="below" onClick={handleClearHistory}>
-                {t("devTools.clearHistory")}
-              </ButtonItem>
-            </PanelSectionRow>
-          </>
-        )}
       </PanelSection>
       <PanelSection title={t("about.title")}>
         <PanelSectionRow>

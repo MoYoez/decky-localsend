@@ -195,7 +195,37 @@ export const en = {
     minutesAgo: "min ago",
     hoursAgo: "hours ago",
     daysAgo: "days ago",
+    textReceived: "Text",
   },
+
+  // Screenshot Gallery (Experimental)
+  screenshot: {
+    title: "Steam Screenshots",
+    openGallery: "Browse Screenshots",
+    experimental: "Experimental Feature",
+    warning: "This feature will show screenshot gallery, which may scan your steam screenshots directory",
+    warningDetails: "This feature will scan screenshot files in ~/.local/share/Steam/userdata/ directory. This is an experimental feature. Do you want to continue?",
+    understand: "I Understand",
+    gallery: "Screenshot Gallery",
+    loading: "Loading...",
+    noScreenshots: "No screenshots found",
+    selectAll: "Select All",
+    selected: "Selected",
+    preview: "Preview",
+    refresh: "Refresh",
+    addToQueue: "Add to Queue",
+    noSelection: "No screenshots selected",
+    pleaseSelectScreenshots: "Please select at least one screenshot",
+    loadFailed: "Failed to load screenshots",
+    imageNotLoaded: "Image not loaded yet",
+    added: "Screenshots Added",
+    screenshotsAdded: "screenshot(s) added to send queue",
+    page: "Page",
+    prevPage: "Previous",
+    nextPage: "Next",
+  },
+
+  unknownError: "Unknown error",
 };
 
 export type TranslationKeys = typeof en;
