@@ -4,7 +4,7 @@
 
 [ENGLISH](README.md) | [简体中文](README-ZH-CN.md)
 
-![preview]([.github/assets/preview_cn.jpg](https://raw.githubusercontent.com/moyoez/decky-localsend/main/.github/assets/preview_cn.jpg)
+![preview](https://raw.githubusercontent.com/moyoez/decky-localsend/main/.github/assets/preview_cn.jpg)
 
 将 Localsend 特性带到 Steam 大屏幕模式中
 
