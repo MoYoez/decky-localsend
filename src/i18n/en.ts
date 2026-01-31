@@ -76,6 +76,8 @@ export const en = {
     notifyOnDownloadDesc: "Show notification when file download is complete",
     saveReceiveHistory: "Save Receive History",
     saveReceiveHistoryDesc: "Save received file history for later viewing",
+    disableInfoLogging: "Disable INFO Logging",
+    disableInfoLoggingDesc: "Disable backend INFO level logging, only show error logs",
     apply: "APPLY",
     configSaved: "Config saved",
     backendRestarted: "Backend restarted",

@@ -73,6 +73,7 @@ export const getBackendConfig = callable<
     notify_on_download: boolean;
     save_receive_history: boolean;
     enable_experimental: boolean;
+    disable_info_logging: boolean;
   }
 >("get_backend_config");
 
@@ -92,6 +93,7 @@ export const setBackendConfig = callable<
       notify_on_download: boolean;
       save_receive_history: boolean;
       enable_experimental: boolean;
+      disable_info_logging: boolean;
     }
   ],
   { success: boolean; restarted: boolean; running: boolean; error?: string }

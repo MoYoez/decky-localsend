@@ -113,6 +113,7 @@ function Content() {
   const [saveReceiveHistory, setSaveReceiveHistory] = useState(true);
   const [networkInfo, setNetworkInfo] = useState<NetworkInfo[]>([]);
   const [enableExperimental, setEnableExperimental] = useState(false);
+  const [disableInfoLogging, setDisableInfoLogging] = useState(false);
 
   // Fetch network info when backend is running
   const fetchNetworkInfo = async () => {
@@ -155,6 +156,7 @@ function Content() {
         setNotifyOnDownload(!!result.notify_on_download);
         setSaveReceiveHistory(result.save_receive_history !== false);
         setEnableExperimental(!!result.enable_experimental);
+        setDisableInfoLogging(!!result.disable_info_logging);
       })
       .catch((error) => {
         toaster.toast({
@@ -289,6 +291,7 @@ function Content() {
       setNotifyOnDownload(!!result.notify_on_download);
       setSaveReceiveHistory(result.save_receive_history !== false);
       setEnableExperimental(!!result.enable_experimental);
+      setDisableInfoLogging(!!result.disable_info_logging);
     } catch (error) {
       console.error("Failed to reload config:", error);
     }
@@ -308,6 +311,7 @@ function Content() {
     notify_on_download?: boolean;
     save_receive_history?: boolean;
     enable_experimental?: boolean;
+    disable_info_logging?: boolean;
   }) => {
     try {
       const currentScanMode = updates.scan_mode ?? scanMode;
@@ -326,6 +330,7 @@ function Content() {
         notify_on_download: updates.notify_on_download ?? notifyOnDownload,
         save_receive_history: updates.save_receive_history ?? saveReceiveHistory,
         enable_experimental: updates.enable_experimental ?? enableExperimental,
+        disable_info_logging: updates.disable_info_logging ?? disableInfoLogging,
       });
       if (!result.success) {
         throw new Error(result.error ?? "Unknown error");
@@ -456,6 +461,7 @@ function Content() {
         notify_on_download: notifyOnDownload,
         save_receive_history: saveReceiveHistory,
         enable_experimental: checked,
+        disable_info_logging: disableInfoLogging,
       });
       if (!result.success) {
         throw new Error(result.error ?? "Unknown error");
@@ -468,6 +474,11 @@ function Content() {
         body: `${error}`,
       });
     }
+  };
+
+  const handleToggleDisableInfoLogging = async (checked: boolean) => {
+    setDisableInfoLogging(checked);
+    await saveConfig({ disable_info_logging: checked });
   };
   
   // Handle factory reset
@@ -495,6 +506,7 @@ function Content() {
               setNotifyOnDownload(false);
               setSaveReceiveHistory(true);
               setEnableExperimental(false);
+              setDisableInfoLogging(false);
               setBackend({ running: false, url: "https://127.0.0.1:53317" });
               resetAll();
               setUploadProgress([]);
@@ -785,6 +797,14 @@ function Content() {
             description={t("config.saveReceiveHistoryDesc")}
             checked={saveReceiveHistory}
             onChange={handleToggleSaveReceiveHistory}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ToggleField
+            label={t("config.disableInfoLogging")}
+            description={t("config.disableInfoLoggingDesc")}
+            checked={disableInfoLogging}
+            onChange={handleToggleDisableInfoLogging}
           />
         </PanelSectionRow>
         <PanelSectionRow>

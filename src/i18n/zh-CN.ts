@@ -78,6 +78,8 @@ export const zhCN: TranslationKeys = {
     notifyOnDownloadDesc: "文件下载完成后显示通知",
     saveReceiveHistory: "保存接收历史",
     saveReceiveHistoryDesc: "保存接收的文件历史记录以便后续查看",
+    disableInfoLogging: "禁用 INFO 日志",
+    disableInfoLoggingDesc: "禁用后端 INFO 级别日志，仅显示错误日志",
     apply: "应用",
     configSaved: "配置已保存",
     backendRestarted: "后端已重启",

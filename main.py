@@ -42,6 +42,7 @@ class Plugin:
         self.notify_on_download = True
         self.save_receive_history = True  # New: save file receive history
         self.enable_experimental = False
+        self.disable_info_logging = False  # Disable INFO level logging
         
         # Unix Domain Socket notification server
         self.socket_path = "/tmp/localsend-notify.sock"
@@ -85,6 +86,7 @@ class Plugin:
                     "notify_on_download": self.notify_on_download,
                     "save_receive_history": self.save_receive_history,
                     "enable_experimental": self.enable_experimental,
+                    "disable_info_logging": self.disable_info_logging,
                     "download_folder": self.upload_dir,
                 }
                 with open(self.settings_path, "w", encoding="utf-8") as f:
@@ -110,6 +112,7 @@ class Plugin:
             self.notify_on_download = bool(data.get("notify_on_download", self.notify_on_download))
             self.save_receive_history = bool(data.get("save_receive_history", self.save_receive_history))
             self.enable_experimental = bool(data.get("enable_experimental", False))
+            self.disable_info_logging = bool(data.get("disable_info_logging", False))
             upload_dir = str(data.get("download_folder", "")).strip()
             if upload_dir:
                 self.upload_dir = upload_dir
@@ -198,6 +201,7 @@ class Plugin:
                         "notify_on_download": self.notify_on_download,
                         "save_receive_history": self.save_receive_history,
                         "enable_experimental": self.enable_experimental,
+                        "disable_info_logging": self.disable_info_logging,
                         "download_folder": self.upload_dir,
                     },
                     f,
@@ -478,12 +482,13 @@ class Plugin:
         env = os.environ.copy()
 
         # Build startup command
+        log_level = "none" if self.disable_info_logging else "prod"
         cmd = [
             self.binary_path,
             "-useConfigPath",
             self.config_path,
             "-log",
-            "prod",
+            log_level,
             "-useDefaultUploadFolder",
             self.upload_dir,
             "-useReferNetworkInterface",
@@ -813,6 +818,7 @@ class Plugin:
             "notify_on_download": self.notify_on_download,
             "save_receive_history": self.save_receive_history,
             "enable_experimental": self.enable_experimental,
+            "disable_info_logging": self.disable_info_logging,
         }
 
     async def set_backend_config(self, config: dict):
@@ -829,6 +835,7 @@ class Plugin:
         notify_on_download = bool(config.get("notify_on_download", False))
         save_receive_history = bool(config.get("save_receive_history", True))
         enable_experimental = bool(config.get("enable_experimental", False))
+        disable_info_logging = bool(config.get("disable_info_logging", False))
 
         self._update_config_yaml({"alias": alias})
 
@@ -849,6 +856,7 @@ class Plugin:
         self.notify_on_download = notify_on_download
         self.save_receive_history = save_receive_history
         self.enable_experimental = enable_experimental
+        self.disable_info_logging = disable_info_logging
 
         self._save_settings()
         self._ensure_dirs()
@@ -941,6 +949,7 @@ class Plugin:
             self.use_https = True
             self.notify_on_download = False
             self.save_receive_history = True
+            self.disable_info_logging = False
             self.upload_dir = os.path.join(decky.DECKY_PLUGIN_RUNTIME_DIR, "uploads")
             
             # Clear upload sessions and receive history
