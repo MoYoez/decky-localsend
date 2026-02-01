@@ -53,11 +53,17 @@ You can customize these settings through the plugin interface.
 
 ## TODO
 
-- None Currently
+- Localsend's official functions. E.G. Save Favorite Device
+
+- Search From reference internet interface,(have done in current api backend)
+
+- Web-Based Transfer when receiver dont's have client. (Shared as Link function)
 
 ## Known Issues
 
-- Sometimes plugin cannot detect other machine(Plugin need scan almost 20s,if not found, consider restarting remote localsend client.)
+- Sometimes plugin cannot detect other machine ( Plugin need scan almost 5s (30s a time automaticlly , default timeout is 500s, can use **Scan Now** To Detect other client ) ,if not found, consider restarting remote localsend client.)
+
+- Plugins can only work in same transfer protocol sometimes, although it has detect method to prevent transfer connection failed.
 
 ## Acknowledgments
 
