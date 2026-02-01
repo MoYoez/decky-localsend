@@ -29,6 +29,13 @@
 
 > 也许？很快上商店了？:(
 
+## 特点
+
+- 全套 Localsend 协议 支持 (除 Web Localsend 外)
+- Shared Via Link 链接单向传送文件
+- 支持浏览截图上传
+- 一些 Localsend 自己的特性 (e.g. 接受历史 PIN码 ，以及部分环境下 http / https 环境处理)
+
 ## 配置说明
 
 插件默认使用以下设置：

@@ -26,6 +26,13 @@ The plugin implements the [LocalSend Protocol](https://github.com/localsend/prot
 4. Your Steam Deck will now be discoverable by other LocalSend clients
 5. Send files from any device running LocalSend to your Steam Deck
 
+## Features
+
+- Full LocalSend protocol support (except Web LocalSend)
+- "Shared Via Link" for one-way file transfer via link
+- Upload and browse screenshots
+- Some unique LocalSend features (e.g., accepting previous PINs, handling HTTP/HTTPS in certain environments)
+
 ## Configuration
 
 The plugin uses the following default settings:
@@ -57,7 +64,7 @@ You can customize these settings through the plugin interface.
 
 ## Known Issues
 
-- Sometimes plugin cannot detect other machine ( Plugin need scan almost 5s (30s a time automaticlly , default timeout is 500s, can use **Scan Now** To Detect other client ) ,if not found, consider restarting remote localsend client.)
+- Sometimes plugin cannot detect other machine ( Plugin need scan almost 5s (30s a time automaticlly , default timeout is 500s, can use **Scan Now** To Detect other client ) .If not found, consider restarting remote localsend client.)
 
 - Plugins can only work in same transfer protocol sometimes, although it has detect method to prevent transfer connection failed.
 
