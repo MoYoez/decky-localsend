@@ -135,7 +135,7 @@ export const ConfigPage: FC = () => {
         setScanMode(configToScanMode(result.legacy_mode ?? false, result.use_mixed_scan ?? true));
         setSkipNotify(!!result.skip_notify);
         setMulticastAddress(result.multicast_address ?? "");
-        setMulticastPort(String(result.multicast_port ?? ""));
+        setMulticastPort(result.multicast_port === 0 || result.multicast_port == null ? "" : String(result.multicast_port));
         setPin(result.pin ?? "");
         setAutoSave(!!result.auto_save);
         setAutoSaveFromFavorites(!!result.auto_save_from_favorites);
@@ -553,7 +553,7 @@ export const ConfigPage: FC = () => {
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
-          <Field label={t("config.multicastPort")}>{multicastPort || t("config.default")}</Field>
+          <Field label={t("config.multicastPort")}>{!multicastPort || multicastPort === "0" ? t("config.default") : multicastPort}</Field>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleEditMulticastPort}>

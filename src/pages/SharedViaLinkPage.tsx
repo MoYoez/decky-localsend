@@ -15,6 +15,7 @@ import { closeShareSession, createShareSession } from "../functions/shareHandler
 import { copyToClipboard } from "../utils/copyClipBoard";
 import { getBackendStatus } from "../functions";
 import { BasicInputBoxModal } from "../components/basicInputBoxModal";
+import { proxyGet } from "../utils/proxyReq";
 import { t } from "../i18n";
 
 // One hour in milliseconds
@@ -34,12 +35,14 @@ export const SharedViaLinkPage: FC = () => {
 
   // Backend status
   const [backendRunning, setBackendRunning] = useState(false);
-  const [backendUrl, setBackendUrl] = useState("");
 
   // Create share settings
   const [sharePin, setSharePin] = useState("");
   const [autoAccept, setAutoAccept] = useState(true);
   const [creating, setCreating] = useState(false);
+
+  // QR code images loaded via proxyGet (sessionId -> data URL)
+  const [qrCodeUrls, setQrCodeUrls] = useState<Record<string, string>>({});
 
   // Tick every second to update remaining times and auto-remove expired sessions
   const [, setTick] = useState(0);
@@ -70,11 +73,9 @@ export const SharedViaLinkPage: FC = () => {
     getBackendStatus()
       .then((status) => {
         setBackendRunning(status.running);
-        setBackendUrl(status.url ?? "");
       })
       .catch(() => {
         setBackendRunning(false);
-        setBackendUrl("");
       });
   }, []);
 
@@ -160,13 +161,31 @@ export const SharedViaLinkPage: FC = () => {
     return `${minutes}:${seconds.toString().padStart(2, "0")} ${t("shareLink.minutes")}`;
   };
 
-  // Generate QR code URL: use local backend /create-qr-code when available, else external
-  const getQRCodeUrl = (dataUrl: string): string => {
-    if (backendUrl) {
-      return `${backendUrl}/api/self/v1/create-qr-code?size=200x200&data=${encodeURIComponent(dataUrl)}`;
-    }
-    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(dataUrl)}`;
-  };
+  // Load QR code via proxyGet for each session
+  useEffect(() => {
+    if (!backendRunning || shareLinkSessions.length === 0) return;
+
+    const loadQrCodes = async () => {
+      const next: Record<string, string> = {};
+      for (const session of shareLinkSessions) {
+        if (qrCodeUrls[session.sessionId]) continue;
+        try {
+          const path = `/api/self/v1/create-qr-code?size=200x200&data=${encodeURIComponent(session.downloadUrl)}`;
+          const result = await proxyGet(path);
+          if (result?.status === 200 && result?.data) {
+            next[session.sessionId] = `data:image/png;base64,${result.data}`;
+          }
+        } catch {
+          // ignore
+        }
+      }
+      if (Object.keys(next).length > 0) {
+        setQrCodeUrls((prev) => ({ ...prev, ...next }));
+      }
+    };
+
+    loadQrCodes();
+  }, [backendRunning, shareLinkSessions, qrCodeUrls]);
 
   const scrollContainerStyle: CSSProperties = {
     padding: "16px",
@@ -361,7 +380,7 @@ export const SharedViaLinkPage: FC = () => {
                   {t("shareLink.qrCode")}
                 </div>
                 <img
-                  src={getQRCodeUrl(session.downloadUrl)}
+                  src={qrCodeUrls[session.sessionId] ?? ""}
                   alt="QR Code"
                   style={{
                     width: "160px",

@@ -277,7 +277,8 @@ class Plugin:
             notification_type = notification.get('type')
             title = notification.get('title', '')
             message = notification.get('message', '')
-            notification_data = notification.get('data', {})
+            # Guard against JSON null: .get('data', {}) returns None when key exists with value null
+            notification_data = notification.get('data') or {}
             is_text_only = notification.get('isTextOnly', False)
 
             self._emit_notification_event({
@@ -286,26 +287,35 @@ class Plugin:
                 "message": message,
                 "data": notification_data,
             })
-            
-            session_id = notification_data.get('sessionId', '')
-            
+
+            # device_discovered / device_updated: no session payload, skip upload logic
+            if notification_type in ('device_discovered', 'device_updated'):
+                decky.logger.debug(f"Device notification: {notification_type} - {title}: {message}")
+                return
+
+            session_id = notification_data.get('sessionId', '') or ''
+
             if notification_type == 'upload_start':
-                # New format: session-level with files array
-                total_files = notification_data.get('totalFiles', 0)
-                total_size = notification_data.get('totalSize', 0)
-                files = notification_data.get('files', [])
+                # New format: session-level with files array (guard against null from backend)
+                total_files = notification_data.get('totalFiles') or 0
+                total_size = notification_data.get('totalSize') or 0
+                files = notification_data.get('files') or []
                 
                 decky.logger.info(f"📤 Upload session started: {session_id}")
                 decky.logger.info(f"   Total files: {total_files}, Total size: {total_size} bytes")
                 
                 # Initialize session
+                do_not_make_session_folder = notification_data.get('doNotMakeSessionFolder', False)
+                upload_folder = notification_data.get('uploadFolder') or ''
                 if session_id not in self.upload_sessions:
                     self.upload_sessions[session_id] = {
                         '_meta': {
                             'total_files': total_files,
                             'total_size': total_size,
                             'start_time': time.time(),
-                            'is_text_only': is_text_only
+                            'is_text_only': is_text_only,
+                            'do_not_make_session_folder': do_not_make_session_folder,
+                            'upload_folder': upload_folder,
                         }
                     }
                 
@@ -329,12 +339,24 @@ class Plugin:
                     }
                 
             elif notification_type == 'upload_end':
-                # New format: session-level summary
-                total_files = notification_data.get('totalFiles', 0)
-                success_files = notification_data.get('successFiles', 0)
-                failed_files = notification_data.get('failedFiles', 0)
-                failed_file_ids = notification_data.get('failedFileIds', [])
-                
+                # New format: session-level summary (guard against null from backend)
+                total_files = notification_data.get('totalFiles') or 0
+                success_files = notification_data.get('successFiles') or 0
+                failed_files = notification_data.get('failedFiles') or 0
+                failed_file_ids = notification_data.get('failedFileIds') or []
+                save_paths = notification_data.get('savePaths') or {}
+                do_not_make_session_folder = notification_data.get('doNotMakeSessionFolder', False)
+                upload_folder = notification_data.get('uploadFolder') or self.upload_dir
+                if save_paths:
+                    first_path = next(iter(save_paths.values()))
+                    folder_path = os.path.dirname(first_path)
+                else:
+                    folder_path = upload_folder if do_not_make_session_folder else os.path.join(upload_folder, session_id)
+                if save_paths:
+                    files_in_folder = [os.path.basename(p) for p in save_paths.values()]
+                else:
+                    files_in_folder = os.listdir(folder_path) if os.path.isdir(folder_path) else []
+
                 decky.logger.info(f"✅ Upload session completed: {session_id}")
                 decky.logger.info(f"   Total: {total_files}, Success: {success_files}, Failed: {failed_files}")
                 if failed_file_ids:
@@ -359,7 +381,7 @@ class Plugin:
                     decky.logger.info(f"📝 Text-only notification detected")
                     # Read text content from uploaded file
                     try:
-                        file_path = os.path.join(self.upload_dir, session_id)
+                        file_path = folder_path
                         txt_files = [f for f in os.listdir(file_path) if f.endswith('.txt')]
                         text_file_name = txt_files[0] if txt_files else ''
                         if text_file_name and os.path.exists(os.path.join(file_path, text_file_name)):
@@ -392,11 +414,6 @@ class Plugin:
                 else:
                     # Send file received notification if enabled
                     try:
-                        folder_path = os.path.join(self.upload_dir, session_id)
-                        files_in_folder = []
-                        if os.path.isdir(folder_path):
-                            files_in_folder = os.listdir(folder_path)
-                        
                         # Save to receive history
                         self._add_receive_history(folder_path, files_in_folder, title or "File Received")
                         
