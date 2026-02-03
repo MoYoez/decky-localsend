@@ -69,7 +69,7 @@ export const createTextHandlers = (
       if (uploadResult.status === 200) {
         toaster.toast({
           title: t("text.sendSuccessTitle"),
-          body: t("text.sendSuccessBody").replace("{device}", selectedDevice.alias || selectedDevice.fingerprint),
+          body: t("text.sendSuccessBody")?.replace("{device}", selectedDevice.alias || selectedDevice.fingerprint || ""),
         });
       } else {
         throw new Error(uploadResult.data?.error || `${t("upload.failedTitle")}: ${uploadResult.status}`);
