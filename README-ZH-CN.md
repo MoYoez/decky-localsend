@@ -34,7 +34,15 @@
 - 全套 Localsend 协议 支持 (除 Web Localsend 外)
 - Shared Via Link 链接单向传送文件
 - 支持浏览截图上传
-- 一些 Localsend 自己的特性 (e.g. 接受历史 PIN码 ，以及部分环境下 http / https 环境处理)
+- 一些 Localsend 自己的特性 (e.g. 接受历史列表 PIN码 ，以及部分环境下 http / https 环境处理)
+
+
+## 可参考的使用场景
+
+- 配合 GridDB 传输一部分图片
+- 一部分场景下在户外的快传软件（毕竟deck是带出门用的多）
+- 免切换快速传截图
+- 多设备临时分享
 
 ## 配置说明
 
