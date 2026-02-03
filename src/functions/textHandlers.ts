@@ -30,25 +30,35 @@ export const createTextHandlers = (
     setUploading(true);
 
     try {
-      // Create a text file entry
+      // Create a text file entry with preview so receiver can show text dialog and return 204 (no upload)
       const textFileId = `text-${Date.now()}`;
-      const filesMap: Record<string, { id: string; fileName: string; size: number; fileType: string }> = {
+      const filesMap: Record<string, { id: string; fileName: string; size: number; fileType: string; preview?: string }> = {
         [textFileId]: {
           id: textFileId,
           fileName: t("text.defaultFileName"),
           size: new Blob([text]).size,
           fileType: "text/plain",
+          preview: text,
         },
       };
 
-      // Prepare upload
+      // Prepare upload (receiver may return 204 for text-only — no upload step)
       const prepareResult = await proxyPost(
         "/api/self/v1/prepare-upload",
         {
           targetTo: selectedDevice.fingerprint,
           files: filesMap,
+          textContent: text,
         }
       );
+
+      if (prepareResult.status === 204) {
+        toaster.toast({
+          title: t("text.sendSuccessTitle"),
+          body: t("text.sendSuccessBody")?.replace("{device}", selectedDevice.alias || selectedDevice.fingerprint || ""),
+        });
+        return;
+      }
 
       if (prepareResult.status !== 200) {
         throw new Error(prepareResult.data?.error || `Prepare upload failed: ${prepareResult.status}`);
@@ -59,7 +69,7 @@ export const createTextHandlers = (
       // Convert text to bytes for upload
       const textBytes = new TextEncoder().encode(text);
 
-      // Upload text
+      // Upload text (only when receiver returned 200 with session)
       const uploadResult = await proxyPost(
         `/api/self/v1/upload?sessionId=${sessionId}&fileId=${textFileId}&token=${tokens[textFileId]}`,
         undefined,

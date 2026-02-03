@@ -293,6 +293,30 @@ class Plugin:
                 decky.logger.debug(f"Device notification: {notification_type} - {title}: {message}")
                 return
 
+            # text_received: single text/plain with preview, receiver returned 204 — no upload session
+            if notification_type == 'text_received':
+                from_alias = notification_data.get('from', '')
+                content = notification_data.get('content', '') or message
+                file_name = notification_data.get('fileName', 'clipboard.txt')
+                display_title = notification_data.get('title') or title or 'Text Received'
+                self._add_receive_history(
+                    folder_path='',
+                    files=[file_name],
+                    title=display_title,
+                    is_text=True,
+                    text_content=content
+                )
+                asyncio.run_coroutine_threadsafe(
+                    decky.emit("text_received", {
+                        "title": display_title,
+                        "content": content,
+                        "fileName": file_name
+                    }),
+                    self.loop
+                )
+                decky.logger.info(f"📝 Text received (no upload) from {from_alias}: {len(content)} chars")
+                return
+
             session_id = notification_data.get('sessionId', '') or ''
 
             if notification_type == 'upload_start':
