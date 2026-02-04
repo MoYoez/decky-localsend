@@ -650,7 +650,7 @@ function Content() {
             <ButtonItem 
               layout="below" 
               onClick={handleOpenScreenshotGallery} 
-              disabled={uploading}
+              disabled={uploading || !backend.running}
             >
               📷 {t("screenshot.openGallery")}
             </ButtonItem>

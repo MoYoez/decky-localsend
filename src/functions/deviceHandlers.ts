@@ -1,4 +1,5 @@
 import { toaster } from "@decky/api";
+import { t } from "../i18n";
 import { proxyGet } from "../utils/proxyReq";
 import type { BackendStatus } from "../types/backend";
 import type { ScanDevice } from "../types/devices";
@@ -32,8 +33,8 @@ export const createDeviceHandlers = (
   const handleRefreshDevices = async () => {
     if (!backend.running) {
       toaster.toast({
-        title: "Backend not running",
-        body: "Please start the LocalSend backend first",
+        title: t("toast.backendNotRunning"),
+        body: t("toast.backendNotRunningBody"),
       });
       return;
     }
@@ -60,8 +61,8 @@ export const createDeviceHandlers = (
   const handleScanNow = async () => {
     if (!backend.running) {
       toaster.toast({
-        title: "Backend not running",
-        body: "Please start the LocalSend backend first",
+        title: t("toast.backendNotRunning"),
+        body: t("toast.backendNotRunningBody"),
       });
       return;
     }

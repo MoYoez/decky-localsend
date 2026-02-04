@@ -203,6 +203,8 @@ export const en = {
 
   // Toasts
   toast: {
+    backendNotRunning: "Backend not running",
+    backendNotRunningBody: "Please start the LocalSend backend first",
     failedGetBackendStatus: "Failed to get backend status",
     failedLoadConfig: "Failed to load config",
     failedSelectFolder: "Failed to select folder",

@@ -206,6 +206,8 @@ export const zhCN: TranslationKeys = {
 
   // Toasts
   toast: {
+    backendNotRunning: "后端未运行",
+    backendNotRunningBody: "请先启动 LocalSend 后端",
     failedGetBackendStatus: "获取后端状态失败",
     failedLoadConfig: "加载配置失败",
     failedSelectFolder: "选择文件夹失败",
