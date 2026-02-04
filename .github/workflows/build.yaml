@@ -55,13 +55,10 @@ jobs:
           unzip -q "$ZIP_FILE" -d /tmp/unpacked
           SRC_DIR=$(find /tmp/unpacked -mindepth 1 -maxdepth 1 -type d | head -1)
           cp -R "$SRC_DIR"/* /tmp/repack/decky-localsend/
-      
-          cd /tmp/repack
-          zip -r decky-localsend.zip decky-localsend
           
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: decky-localsend
-          path: /tmp/repack/
+          path: /tmp/repack/decky-localsend
           if-no-files-found: error
