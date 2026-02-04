@@ -18,6 +18,8 @@
 
 将 Localsend 特性带到 Steam 大屏幕模式中
 
+相关后端项目: [MoYoez/localsend-go]https://github.com/MoYoez/localsend-go
+
 </div>
 
 ---

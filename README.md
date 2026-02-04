@@ -17,6 +17,8 @@
 
 A Decky Loader plugin that brings LocalSend functionality to Steam Deck gaming mode.
 
+Related Backend Repo: [MoYoez/localsend-go](https://github.com/MoYoez/localsend-go)
+
 </div>
 
 ---
