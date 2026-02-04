@@ -1021,7 +1021,7 @@ export default definePlugin(() => {
     // The name shown in various decky menus
     name: "LocalSend",
     // The element displayed at the top of your plugin's menu
-    titleView: <div className={staticClasses.Title}>decky-LocalSend</div>,
+    titleView: <div className={staticClasses.Title}>Decky Localsend</div>,
     // The content of your plugin's menu
     content: <Content />,
     // The icon displayed in the plugin list
