@@ -14,6 +14,7 @@ interface ConfirmReceiveModalProps {
   from: string;
   fileCount: number;
   files: { fileName: string; size?: number; fileType?: string }[];
+  totalFiles?: number;
   onConfirm: (confirmed: boolean) => void;
   closeModal?: () => void;
 }
@@ -23,6 +24,7 @@ export const ConfirmReceiveModal = ({
   from,
   fileCount,
   files,
+  totalFiles,
   onConfirm,
   closeModal,
 }: ConfirmReceiveModalProps) => {
@@ -46,6 +48,11 @@ export const ConfirmReceiveModal = ({
                 {typeof file.size === "number" ? ` (${file.size} bytes)` : ""}
               </div>
             ))}
+            {totalFiles != null && totalFiles > files.length && (
+              <div style={{ marginTop: "6px", color: "#8a8a8a", fontSize: "12px" }}>
+                {t("fileReceived.andMoreFiles").replace("{count}", String(totalFiles - files.length))}
+              </div>
+            )}
           </Focusable>
         )}
       </DialogBody>

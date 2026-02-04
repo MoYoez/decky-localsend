@@ -878,11 +878,14 @@ export default definePlugin(() => {
     if (event.type === "confirm_recv") {
       const data = event.data ?? {};
       const sessionId = String(data.sessionId || "");
+      const files = Array.isArray(data.files) ? data.files : [];
+      const totalFiles = data.totalFiles != null ? Number(data.totalFiles) : undefined;
       const modalResult = showModal(
         <ConfirmReceiveModal
           from={String(data.from || "")}
           fileCount={Number(data.fileCount || 0)}
-          files={Array.isArray(data.files) ? data.files : []}
+          files={files}
+          totalFiles={totalFiles}
           onConfirm={async (confirmed) => {
             if (!sessionId) {
               toaster.toast({
@@ -920,10 +923,12 @@ export default definePlugin(() => {
       const sessionId = String(data.sessionId || "");
       const fileCount = Number(data.fileCount || 0);
       const files = Array.isArray(data.files) ? data.files : [];
+      const totalFiles = data.totalFiles != null ? Number(data.totalFiles) : undefined;
       const modalResult = showModal(
         <ConfirmDownloadModal
           fileCount={fileCount}
           files={files}
+          totalFiles={totalFiles}
           onConfirm={async (confirmed) => {
             if (!sessionId) {
               toaster.toast({
