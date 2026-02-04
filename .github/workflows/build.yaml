@@ -45,9 +45,18 @@ jobs:
           sudo $(pwd)/cli/decky plugin build -b -o /tmp/output
           sudo chown -R $(whoami) /tmp/output
 
+      - name: Repack artifact
+        run: |
+          ZIP_FILE=$(ls /tmp/output/*.zip | head -1)
+          unzip -q "$ZIP_FILE" -d /tmp/unpacked
+          TOP_DIR=$(ls /tmp/unpacked)
+          mkdir -p /tmp/repack/decky-localsend
+          cp -R /tmp/unpacked/"$TOP_DIR"/* /tmp/repack/decky-localsend/
+          cd /tmp/repack && zip -r decky-localsend.zip decky-localsend
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: decky-localsend
-          path: /tmp/output/*.zip
+          path: /tmp/repack/decky-localsend.zip
           if-no-files-found: error
