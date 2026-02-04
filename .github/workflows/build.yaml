@@ -48,12 +48,17 @@ jobs:
       - name: Repack artifact
         run: |
           ZIP_FILE=$(ls /tmp/output/*.zip | head -1)
+    
+          rm -rf /tmp/unpacked /tmp/repack
+          mkdir -p /tmp/unpacked /tmp/repack/decky-localsend
+    
           unzip -q "$ZIP_FILE" -d /tmp/unpacked
-          TOP_DIR=$(ls /tmp/unpacked)
-          mkdir -p /tmp/repack/decky-localsend
-          cp -R /tmp/unpacked/"$TOP_DIR"/* /tmp/repack/decky-localsend/
-          cd /tmp/repack && zip -r decky-localsend.zip decky-localsend
-
+          SRC_DIR=$(find /tmp/unpacked -mindepth 1 -maxdepth 1 -type d | head -1)
+          cp -R "$SRC_DIR"/* /tmp/repack/decky-localsend/
+      
+          cd /tmp/repack
+          zip -r decky-localsend.zip decky-localsend
+          
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
