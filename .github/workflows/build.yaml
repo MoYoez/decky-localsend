@@ -41,8 +41,9 @@ jobs:
 
       - name: Build with Decky CLI
         run: |
+          sudo mkdir -p /tmp/output
           sudo $(pwd)/cli/decky plugin build -b -o /tmp/output
-          sudo chown -R $(whoami) out
+          sudo chown -R $(whoami) /tmp/output
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
