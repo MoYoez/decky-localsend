@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src=".github/assets/send-to-back.svg" width="64" height="64" alt="Decky Localsend" />
+<img src=".github/assets/send-to-back.svg" width="128" height="128" alt="Decky Localsend" />
 
 # Decky Localsend ![visitors](https://visitor-badge.laobi.icu/badge?page_id=moyoez/Decky-localsend) ![Release](https://img.shields.io/github/v/release/moyoez/decky-localsend) 
 
