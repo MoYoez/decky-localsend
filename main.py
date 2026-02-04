@@ -847,7 +847,7 @@ class Plugin:
             self.save_receive_history = True
             self.enable_experimental = False
             self.use_download = False
-            self.disable_info_logging = False
+            self.disable_info_logging = True
             self.scan_timeout = 500
             self.upload_dir = os.path.join(decky.DECKY_PLUGIN_RUNTIME_DIR, "uploads")
             

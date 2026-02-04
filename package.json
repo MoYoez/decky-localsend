@@ -1,6 +1,6 @@
 {
   "name": "decky-localsend",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "Use Localsend in gaming mode.",
   "type": "module",
   "scripts": {

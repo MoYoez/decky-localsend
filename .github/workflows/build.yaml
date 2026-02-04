@@ -1,0 +1,61 @@
+name: Build
+
+on:
+  - push
+  - pull_request
+
+permissions:
+  contents: write
+
+jobs:
+  build_plugin:
+    name: Build Plugin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: pnpm
+
+      - name: Install package and build
+        run: |
+          pnpm install --no-frozen-lockfile
+          pnpm build
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build backend
+        run: |
+          mkdir -p backend/out
+          cd backend/localsend
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o ../out/localsend-core .
+
+      - name: Collect files
+        run: |
+          mkdir -p release/DeckyLocalsend/bin
+          cp -R dist py_modules release/DeckyLocalsend/
+          cp main.py plugin.json package.json LICENSE release/DeckyLocalsend/
+          cp backend/out/localsend-core release/DeckyLocalsend/bin/
+          cd release
+          zip -r DeckyLocalsend.zip DeckyLocalsend
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deckylocalsend-artifacts
+          path: ./release/DeckyLocalsend.zip
+          if-no-files-found: error
