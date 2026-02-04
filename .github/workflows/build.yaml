@@ -18,6 +18,9 @@ jobs:
         with:
           submodules: true
 
+      - name: Set SYSTEM_ARCH
+        run: echo "SYSTEM_ARCH=$RUNNER_OS" >> $GITHUB_ENV
+
       - uses: pnpm/action-setup@v4
         with:
           version: latest
@@ -28,41 +31,20 @@ jobs:
           node-version: '20.x'
           cache: pnpm
 
-      - name: Install package and build
+      - name: Download Decky CLI
         run: |
-          pnpm install --no-frozen-lockfile
-          pnpm build
+          mkdir -p cli
+          if [[ "$SYSTEM_ARCH" =~ "Linux" ]]; then
+            curl -L -o "$(pwd)/cli/decky" "https://github.com/SteamDeckHomebrew/cli/releases/latest/download/decky-linux-x86_64"
+            chmod +x cli/decky
+          fi
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-
-      - name: Build backend web
-        run: |
-          cd backend/localsend/web
-          pnpm install --no-frozen-lockfile
-          pnpm build
-
-      - name: Build backend
-        run: |
-          mkdir -p backend/out
-          cd backend/localsend
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o ../out/localsend-core .
-
-      - name: Collect files
-        run: |
-          mkdir -p release/DeckyLocalsend/bin release/DeckyLocalsend/bin/web/out
-          cp -R dist py_modules release/DeckyLocalsend/
-          cp main.py README.md plugin.json package.json LICENSE release/DeckyLocalsend/
-          cp backend/out/localsend-core release/DeckyLocalsend/bin/
-          cp -R backend/localsend/web/out release/DeckyLocalsend/bin/web/
-          cd release
-          zip -r DeckyLocalsend.zip DeckyLocalsend
+      - name: Build with Decky CLI
+        run: ./cli/decky plugin build .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: decky-localsend
-          path: ./release/DeckyLocalsend.zip
+          path: "out/DeckyLocalsend.zip"
           if-no-files-found: error
