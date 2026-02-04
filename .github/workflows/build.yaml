@@ -41,12 +41,12 @@ jobs:
 
       - name: Build with Decky CLI
         run: |
-          sudo ./cli/decky plugin build .
+          sudo $(pwd)/cli/decky plugin build -b -o /tmp/output
           sudo chown -R $(whoami) out
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: decky-localsend
-          path: "out/DeckyLocalsend.zip"
+          path: /tmp/output/*.zip
           if-no-files-found: error
