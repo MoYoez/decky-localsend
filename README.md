@@ -85,6 +85,20 @@ You can customize these settings through the plugin interface.
 
 - When transferring a very large number of files (tested with 3000+ files) to the Deck, the sending side of LocalSend may appear to stutter or become choppy due to multiple running threads. However, this does not affect the actual file transfer.
 
+
+- HTTP scanning may cause increased latency. HTTP timeout has been set to 60 seconds and runs every 30 seconds by default. Devices are updated via Notify, so you do not need to manually refresh to see remote devices.
+
+### Compatibility Table
+
+| Communication Method | Decky-Localsend Supported | Discoverable Remote Localsend Devices | Notes                                       |
+|---------------------|---------------------------|---------------------------------------|---------------------------------------------|
+| UDP Scan            | HTTP/HTTPS                | HTTP, HTTPS                           | UDP can discover devices with any protocol. |
+| HTTP Communication  | HTTP                      | HTTP                                  | Only devices with HTTP protocol are supported. |
+| HTTPS Communication | HTTPS                     | HTTPS                                 | Only devices with HTTPS protocol are supported. |
+
+> With UDP communication, Decky-Localsend can discover remote devices regardless of whether their protocol is HTTP or HTTPS.
+
+
 ## Acknowledgments
 
 - [LocalSend](https://localsend.org)

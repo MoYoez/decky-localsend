@@ -86,6 +86,24 @@
 
 - 在大量且多（测试文件数量3000+）传输给 Deck 的时候，因为跑的线程很多，Localsend 传输端 可能会出现抽搐的情况（但实际不影响传输）
 
+- HTTP 扫描可能会造成延迟增加，HTTP超时已经默认调整成 60s ,30s一次，默认使用 Notify 进行设备更新，可不用刷新获取设备
+
+### 兼容表
+
+| 通信方式      | Decky-Localsend 支持 | 能发现的远程 Localsend 设备 | 说明                                      |
+|---------------|---------------------|---------------------------|-------------------------------------------|
+| UDP 扫描      | HTTP/HTTPS          | HTTP、HTTPS               | UDP 能发现任意协议设备                     |
+| HTTP 通信     | HTTP                | HTTP                      | 仅支持与 HTTP 协议设备互通                 |
+| HTTPS 通信    | HTTPS               | HTTPS                     | 仅支持与 HTTPS 协议设备互通                |
+
+> UDP 通信下，无论远程设备是 HTTP 还是 HTTPS，Decky-Localsend 都能扫描并发现。
+
+
+
+
+
+
+
 ## 鸣谢
 
 - [LocalSend](https://localsend.org)
