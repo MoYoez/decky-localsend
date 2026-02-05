@@ -132,8 +132,8 @@ class Plugin:
                     logger=lambda msg: decky.logger.error(msg)
                 )
                 self.alias = str(yaml_config.get("alias", "")).strip()
-            self.legacy_mode = bool(data.get("legacy_mode", self.legacy_mode))
-            self.use_mixed_scan = bool(data.get("use_mixed_scan", self.use_mixed_scan))
+            self.legacy_mode = False
+            self.use_mixed_scan = True
             self.skip_notify = bool(data.get("skip_notify", self.skip_notify))
             self.multicast_address = str(data.get("multicast_address", self.multicast_address)).strip()
             multicast_port = data.get("multicast_port", self.multicast_port)
@@ -517,10 +517,6 @@ class Plugin:
             cmd.extend(["-useMultcastAddress", self.multicast_address])
         if self.multicast_port > 0:
             cmd.extend(["-useMultcastPort", str(self.multicast_port)])
-        if self.legacy_mode:
-            cmd.append("-useLegacyMode")
-        if self.use_mixed_scan:
-            cmd.append("-useMixedScan")
         if self.skip_notify:
             cmd.append("-skipNotify")
         if self.pin:
@@ -746,8 +742,8 @@ class Plugin:
         if download_folder:
             self.upload_dir = download_folder
 
-        self.legacy_mode = legacy_mode
-        self.use_mixed_scan = use_mixed_scan
+        self.legacy_mode = False
+        self.use_mixed_scan = True
         self.skip_notify = skip_notify
         self.multicast_address = multicast_address
         try:

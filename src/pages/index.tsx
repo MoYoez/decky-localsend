@@ -33,37 +33,6 @@ import { NetworkInterfaceSelectModal } from "../components/NetworkInterfaceSelec
 import { FavoritesAddModal } from "../components/FavoritesAddModal";
 import type { NetworkInfo } from "../types/devices";
 
-// Scan Mode Enum
-enum ScanMode {
-  Mixed = 0,
-  Normal = 1,
-  HTTP = 2,
-}
-
-const scanModeNotchLabels = [
-  { notchIndex: 0, label: "Mixed", value: 0 },
-  { notchIndex: 1, label: "Normal", value: 1 },
-  { notchIndex: 2, label: "HTTP", value: 2 },
-];
-
-const configToScanMode = (legacyMode: boolean, useMixedScan: boolean): ScanMode => {
-  if (useMixedScan) return ScanMode.Mixed;
-  if (legacyMode) return ScanMode.HTTP;
-  return ScanMode.Normal;
-};
-
-const scanModeToConfig = (mode: ScanMode): { legacy_mode: boolean; use_mixed_scan: boolean } => {
-  switch (mode) {
-    case ScanMode.Mixed:
-      return { legacy_mode: false, use_mixed_scan: true };
-    case ScanMode.HTTP:
-      return { legacy_mode: true, use_mixed_scan: false };
-    case ScanMode.Normal:
-    default:
-      return { legacy_mode: false, use_mixed_scan: false };
-  }
-};
-
 // Main Config Page with SidebarNavigation
 export const ConfigPage: FC = () => {
   const devices = useLocalSendStore((state) => state.devices);
@@ -75,7 +44,6 @@ export const ConfigPage: FC = () => {
   // Config states
   const [configAlias, setConfigAlias] = useState("");
   const [downloadFolder, setDownloadFolder] = useState("");
-  const [scanMode, setScanMode] = useState<ScanMode>(ScanMode.Mixed);
   const [skipNotify, setSkipNotify] = useState(false);
   const [multicastAddress, setMulticastAddress] = useState("");
   const [multicastPort, setMulticastPort] = useState("");
@@ -132,7 +100,6 @@ export const ConfigPage: FC = () => {
       .then((result) => {
         setConfigAlias(result.alias ?? "");
         setDownloadFolder(result.download_folder ?? "");
-        setScanMode(configToScanMode(result.legacy_mode ?? false, result.use_mixed_scan ?? true));
         setSkipNotify(!!result.skip_notify);
         setMulticastAddress(result.multicast_address ?? "");
         setMulticastPort(result.multicast_port === 0 || result.multicast_port == null ? "" : String(result.multicast_port));
@@ -179,12 +146,11 @@ export const ConfigPage: FC = () => {
   // Save config helper
   const saveConfig = async (updates: Record<string, any>) => {
     try {
-      const { legacy_mode, use_mixed_scan } = scanModeToConfig(scanMode);
       const result = await setBackendConfig({
         alias: updates.alias ?? configAlias,
         download_folder: updates.download_folder ?? downloadFolder,
-        legacy_mode: updates.legacy_mode ?? legacy_mode,
-        use_mixed_scan: updates.use_mixed_scan ?? use_mixed_scan,
+        legacy_mode: false,
+        use_mixed_scan: true,
         skip_notify: updates.skip_notify ?? skipNotify,
         multicast_address: updates.multicast_address ?? multicastAddress,
         multicast_port: updates.multicast_port ?? multicastPort,
@@ -287,13 +253,6 @@ export const ConfigPage: FC = () => {
     }
   };
 
-  const handleScanModeChange = (value: number) => {
-    const mode = value as ScanMode;
-    setScanMode(mode);
-    const { legacy_mode, use_mixed_scan } = scanModeToConfig(mode);
-    saveConfig({ legacy_mode, use_mixed_scan });
-  };
-
   const handleEditScanTimeout = async () => {
     const value = await openInputModal(t("config.editScanTimeout"), t("modal.enterScanTimeout"));
     if (value !== null) {
@@ -349,7 +308,6 @@ export const ConfigPage: FC = () => {
             if (result.success) {
               setConfigAlias("");
               setDownloadFolder("");
-              setScanMode(ScanMode.Mixed);
               setSkipNotify(false);
               setMulticastAddress("");
               setMulticastPort("");
@@ -559,20 +517,6 @@ export const ConfigPage: FC = () => {
           <ButtonItem layout="below" onClick={handleEditMulticastPort}>
             {t("config.editMulticastPort")}
           </ButtonItem>
-        </PanelSectionRow>
-        <PanelSectionRow>
-          <SliderField
-            label={t("config.scanMode")}
-            description={t("config.scanModeDesc")}
-            value={scanMode}
-            min={0}
-            max={scanModeNotchLabels.length - 1}
-            notchCount={scanModeNotchLabels.length}
-            notchLabels={scanModeNotchLabels}
-            notchTicksVisible={true}
-            step={1}
-            onChange={handleScanModeChange}
-          />
         </PanelSectionRow>
         <PanelSectionRow>
           <Field label={t("config.scanTimeout")}>{scanTimeout || "500"}s</Field>
