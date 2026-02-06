@@ -320,7 +320,7 @@ function Content() {
       });
 
       const hasFolders = folderItems.length > 0;
-      const folderPath = hasFolders ? folderItems[0].folderPath : null;
+      const folderPaths = hasFolders ? folderItems.map((f) => f.folderPath!).filter(Boolean) : [];
       const hasExtraFiles = Object.keys(filesMap).length > 0;
 
       // Build FastSender request
@@ -335,11 +335,11 @@ function Content() {
 
       // Prepare upload with FastSender mode
       let prepareResult;
-      if (hasFolders && folderPath) {
+      if (hasFolders && folderPaths.length > 0) {
         prepareResult = await proxyPost("/api/self/v1/prepare-upload", {
           ...fastSenderParams,
           useFolderUpload: true,
-          folderPath: folderPath,
+          folderPaths: folderPaths,
           ...(hasExtraFiles && { files: filesMap }),
         });
       } else {
@@ -394,7 +394,7 @@ function Content() {
       if (hasFilesToUpload) {
         let batchUploadResult;
         
-        if (hasFolders && folderPath) {
+        if (hasFolders && folderPaths.length > 0) {
           const extraFiles = regularFiles.map((fileInfo) => ({
             fileId: fileInfo.id,
             token: tokens[fileInfo.id] || "",
@@ -404,7 +404,7 @@ function Content() {
           batchUploadResult = await proxyPost("/api/self/v1/upload-batch", {
             sessionId: sessionId,
             useFolderUpload: true,
-            folderPath: folderPath,
+            folderPaths: folderPaths,
             ...(extraFiles.length > 0 && { files: extraFiles }),
           });
         } else {

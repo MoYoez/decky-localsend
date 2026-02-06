@@ -72,21 +72,20 @@ export const createUploadHandlers = (
 
       // Determine if we're using folder upload mode
       const hasFolders = folderItems.length > 0;
-      // For now, support single folder upload (use the first folder if multiple)
-      const folderPath = hasFolders ? folderItems[0].folderPath : null;
+      const folderPaths = hasFolders ? folderItems.map((f) => f.folderPath!).filter(Boolean) : [];
       const hasExtraFiles = Object.keys(filesMap).length > 0;
 
       const prepareUpload = (pin?: string) => {
         const pinParam = pin ? `?pin=${encodeURIComponent(pin)}` : "";
         
-        if (hasFolders && folderPath) {
-          // Mixed mode: folder + extra files
+        if (hasFolders && folderPaths.length > 0) {
+          // Mixed mode: folder(s) + extra files
           return proxyPost(
             `/api/self/v1/prepare-upload${pinParam}`,
             {
               targetTo: targetDevice.fingerprint,
               useFolderUpload: true,
-              folderPath: folderPath,
+              folderPaths: folderPaths,
               ...(hasExtraFiles && { files: filesMap }),
             }
           );
@@ -156,7 +155,7 @@ export const createUploadHandlers = (
       if (hasFilesToUpload) {
         let batchUploadResult;
         
-        if (hasFolders && folderPath) {
+        if (hasFolders && folderPaths.length > 0) {
           // Build extra files array for mixed upload
           const extraFiles = regularFiles.map((fileInfo) => ({
             fileId: fileInfo.id,
@@ -169,7 +168,7 @@ export const createUploadHandlers = (
             {
               sessionId: sessionId,
               useFolderUpload: true,
-              folderPath: folderPath,
+              folderPaths: folderPaths,
               ...(extraFiles.length > 0 && { files: extraFiles }),
             }
           );
