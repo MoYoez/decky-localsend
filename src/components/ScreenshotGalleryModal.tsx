@@ -7,10 +7,7 @@ import {
 import { useState, useEffect } from "react";
 import { toaster } from "@decky/api";
 import { t } from "../i18n";
-import { callable } from "@decky/api";
 import { proxyGet } from "../utils/proxyReq";
-
-const getSteamScreenshots = callable<[number], any>("get_steam_screenshots");
 
 interface Screenshot {
   path: string;
@@ -28,13 +25,18 @@ interface ScreenshotGalleryModalProps {
 
 export const ScreenshotGalleryModal = ({ onSelectScreenshots, closeModal }: ScreenshotGalleryModalProps) => {
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
+  const [total, setTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [selectAll, setSelectAll] = useState(false);
   const [imageBlobUrls, setImageBlobUrls] = useState<Map<string, string>>(new Map());
 
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
   useEffect(() => {
-    loadScreenshots();
+    loadScreenshots(1);
   }, []);
 
   // Load images through proxyGet
@@ -78,18 +80,31 @@ export const ScreenshotGalleryModal = ({ onSelectScreenshots, closeModal }: Scre
   }, [screenshots]);
 
   
-  const loadScreenshots = async () => {
+  const loadScreenshots = async (page: number, refreshNow?: boolean) => {
     setLoading(true);
     try {
-      const result = await getSteamScreenshots(50);
-      if (result.success) {
-        setScreenshots(result.screenshots || []);
-      } else {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+      });
+      if (refreshNow) {
+        params.set("refresh-now", "1");
+      }
+      const result = await proxyGet(`/api/self/v1/get-user-screenshot?${params.toString()}`);
+      const status = result?.status;
+      const data = result?.data;
+      if (status !== 200 || data?.error) {
         toaster.toast({
           title: t("screenshot.loadFailed"),
-          body: result.error || t("common.unknownError"),
+          body: data?.error || t("common.unknownError"),
         });
+        return;
       }
+      const list = data?.data?.screenshots ?? [];
+      const totalCount = data?.data?.total ?? 0;
+      setScreenshots(list);
+      setTotal(totalCount);
+      setCurrentPage(page);
     } catch (error) {
       toaster.toast({
         title: t("screenshot.loadFailed"),
@@ -139,23 +154,17 @@ export const ScreenshotGalleryModal = ({ onSelectScreenshots, closeModal }: Scre
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  // Pagination
-  const itemsPerPage = 10;
-  const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = Math.ceil(screenshots.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentScreenshots = screenshots.slice(startIndex, endIndex);
+  const currentScreenshots = screenshots;
 
   const goToNextPage = () => {
     if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
+      loadScreenshots(currentPage + 1);
     }
   };
 
   const goToPrevPage = () => {
     if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
+      loadScreenshots(currentPage - 1);
     }
   };
 
@@ -344,7 +353,7 @@ export const ScreenshotGalleryModal = ({ onSelectScreenshots, closeModal }: Scre
               <div style={{ display: "flex", gap: "8px" }}>
                 <DialogButton 
                   style={{ minWidth: "50px", padding: "8px 12px", fontSize: "13px" }}
-                  onClick={loadScreenshots}
+                  onClick={() => loadScreenshots(currentPage, true)}
                 >
                   {t("screenshot.refresh")}
                 </DialogButton>
