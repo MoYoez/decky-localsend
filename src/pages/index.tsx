@@ -634,17 +634,6 @@ export const ConfigPage: FC = () => {
           />
         </PanelSectionRow>
         <PanelSectionRow>
-          <ToggleField
-            label={t("screenshot.experimental")}
-            description={t("screenshot.warning")}
-            checked={enableExperimental}
-            onChange={(checked: boolean) => {
-              setEnableExperimental(checked);
-              saveConfig({ enable_experimental: checked });
-            }}
-          />
-        </PanelSectionRow>
-        <PanelSectionRow>
           <ButtonItem layout="below" onClick={handleFactoryReset}>
             {t("settings.resetAllData")}
           </ButtonItem>
