@@ -214,7 +214,7 @@ export const ScreenshotGalleryModal = ({ onSelectScreenshots, closeModal }: Scre
                   {t("screenshot.page")}: {currentPage} / {totalPages}
                 </span>
                 <span style={{ fontSize: "14px", opacity: 0.8 }}>
-                  {t("screenshot.selected")}: {selectedPaths.size} / {screenshots.length}
+                  {t("screenshot.selected")}: {selectedPaths.size} / {total}
                 </span>
               </div>
             </div>
