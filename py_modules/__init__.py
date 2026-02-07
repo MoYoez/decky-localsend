@@ -13,7 +13,6 @@ from .config_utils import (
 )
 from .file_utils import (
     list_folder_files,
-    get_steam_screenshots,
     load_receive_history,
     save_receive_history,
     create_receive_history_entry,
@@ -33,7 +32,6 @@ __all__ = [
     'save_json_settings',
     # file_utils
     'list_folder_files',
-    'get_steam_screenshots',
     'load_receive_history',
     'save_receive_history',
     'create_receive_history_entry',

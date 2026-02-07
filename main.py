@@ -18,7 +18,6 @@ from config_utils import (  # pyright: ignore[reportMissingImports]
 )
 from file_utils import (  # pyright: ignore[reportMissingImports]
     list_folder_files,
-    get_steam_screenshots,
     load_receive_history,
     save_receive_history,
     create_receive_history_entry,
@@ -849,13 +848,7 @@ class Plugin:
             decky.logger.error(f"Factory reset failed: {e}")
             return {"success": False, "error": str(e)}
 
-    # EXPERIMENTAL: MAY BREAK STEAM TOS, be aware of risks.
-    async def get_steam_screenshots(self, limit: int = 50):
-        """Get Steam screenshots sorted by time"""
-        return get_steam_screenshots(
-            limit=limit,
-            logger=lambda msg: decky.logger.info(msg)
-        )
+
 
     # BASE decky python-backend.
     async def _main(self):
