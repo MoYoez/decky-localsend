@@ -45,6 +45,7 @@ import { createFileHandlers } from "./functions/fileHandlers";
 import { createUploadHandlers } from "./functions/uploadHandlers";
 import { confirmDownload } from "./functions/shareHandlers";
 import { proxyGet, proxyPost } from "./utils/proxyReq";
+import { requestPin } from "./utils/requestPin";
 import { LuSendToBack } from "react-icons/lu";
 
 function Content() {
@@ -333,20 +334,33 @@ function Content() {
         fastSenderParams.useFastSenderIPSuffex = trimmedInput;
       }
 
-      // Prepare upload with FastSender mode
-      let prepareResult;
-      if (hasFolders && folderPaths.length > 0) {
-        prepareResult = await proxyPost("/api/self/v1/prepare-upload", {
-          ...fastSenderParams,
-          useFolderUpload: true,
-          folderPaths: folderPaths,
-          ...(hasExtraFiles && { files: filesMap }),
-        });
-      } else {
-        prepareResult = await proxyPost("/api/self/v1/prepare-upload", {
+      const prepareUpload = (pin?: string) => {
+        const pinParam = pin ? `?pin=${encodeURIComponent(pin)}` : "";
+        if (hasFolders && folderPaths.length > 0) {
+          return proxyPost(`/api/self/v1/prepare-upload${pinParam}`, {
+            ...fastSenderParams,
+            useFolderUpload: true,
+            folderPaths: folderPaths,
+            ...(hasExtraFiles && { files: filesMap }),
+          });
+        }
+        return proxyPost(`/api/self/v1/prepare-upload${pinParam}`, {
           ...fastSenderParams,
           files: filesMap,
         });
+      };
+
+      let prepareResult = await prepareUpload();
+      if (prepareResult.status === 401) {
+        toaster.toast({
+          title: t("toast.pinRequired"),
+          body: t("toast.pinRequiredForFiles"),
+        });
+        const pin = await requestPin(t("toast.pinRequired"));
+        if (!pin) {
+          throw new Error(t("upload.pinRequiredToContinue"));
+        }
+        prepareResult = await prepareUpload(pin);
       }
 
       if (prepareResult.status !== 200) {
