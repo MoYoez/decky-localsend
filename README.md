@@ -41,7 +41,7 @@ Related Backend Repo: [MoYoez/localsend-go](https://github.com/MoYoez/localsend-
 
 ## Usage
 
-1. Install the plugin on your Steam Deck(Install from release / download from decky test Store (v0.32))
+1. Install the plugin on your Steam Deck(Install from release / download from decky test Store (Decky Localsend 0.37-1a47753))
 2. Open the plugin from the Quick Access menu
 3. The LocalSend server will start automatically when clicking start Backend
 4. Your Steam Deck will now be discoverable by other LocalSend clients
