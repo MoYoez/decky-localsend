@@ -15,8 +15,19 @@ interface ConfirmDownloadModalProps {
   fileCount: number;
   files: { id?: string; fileName?: string; size?: number; fileType?: string }[];
   totalFiles?: number;
+  /** Client IP for display */
+  clientIp?: string;
+  /** User-Agent or browser name for display */
+  clientType?: string;
+  userAgent?: string;
   onConfirm: (confirmed: boolean) => void;
   closeModal?: () => void;
+}
+
+function clientLabel(clientType?: string, userAgent?: string): string {
+  if (clientType) return clientType;
+  if (userAgent && userAgent.length > 50) return userAgent.slice(0, 50) + "…";
+  return userAgent || "";
 }
 
 export const ConfirmDownloadModal = ({
@@ -25,6 +36,9 @@ export const ConfirmDownloadModal = ({
   fileCount,
   files,
   totalFiles,
+  clientIp,
+  clientType,
+  userAgent,
   onConfirm,
   closeModal,
 }: ConfirmDownloadModalProps) => {
@@ -33,10 +47,22 @@ export const ConfirmDownloadModal = ({
     onConfirm(confirmed);
   };
 
+  const fromLine =
+    clientIp != null
+      ? t("confirmDownload.fromClient")
+          .replace("{clientLabel}", clientLabel(clientType, userAgent) || "Unknown")
+          .replace("{clientIp}", clientIp)
+      : null;
+
   return (
     <ModalRoot onCancel={() => handleConfirm(false)} closeModal={closeModal}>
       <DialogHeader>{title || t("confirmDownload.title")}</DialogHeader>
       <DialogBody>
+        {fromLine && (
+          <div style={{ marginBottom: "8px", fontSize: "12px", color: "#b8b6b4" }}>
+            {fromLine}
+          </div>
+        )}
         <div style={{ marginBottom: "10px", fontSize: "12px", color: "#b8b6b4" }}>
           {message || `${t("confirmDownload.message")} ${fileCount} ${t("common.files")}`}
         </div>

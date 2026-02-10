@@ -235,6 +235,7 @@ export const en = {
   confirmDownload: {
     title: "Confirm Download",
     message: "Someone is requesting to download",
+    fromClient: "From {clientLabel} ({clientIp})",
     accept: "Allow",
     reject: "Reject",
   },

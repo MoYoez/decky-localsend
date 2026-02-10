@@ -96,10 +96,15 @@ export async function closeShareSession(sessionId: string): Promise<void> {
 
 /**
  * Confirm or reject a download request (when autoAccept=false).
+ * clientKey identifies the requesting device (e.g. IP) for per-device confirmation.
  */
-export async function confirmDownload(sessionId: string, confirmed: boolean): Promise<void> {
+export async function confirmDownload(
+  sessionId: string,
+  clientKey: string,
+  confirmed: boolean
+): Promise<void> {
   const res = await proxyGet(
-    `/api/self/v1/confirm-download?sessionId=${encodeURIComponent(sessionId)}&confirmed=${confirmed}`
+    `/api/self/v1/confirm-download?sessionId=${encodeURIComponent(sessionId)}&clientKey=${encodeURIComponent(clientKey)}&confirmed=${confirmed}`
   );
   if (res.status !== 200) {
     throw new Error(res.data?.error || `Confirm download failed: ${res.status}`);

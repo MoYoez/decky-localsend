@@ -238,6 +238,7 @@ export const zhCN: TranslationKeys = {
   confirmDownload: {
     title: "确认下载",
     message: "有人请求下载",
+    fromClient: "来自 {clientLabel}（{clientIp}）",
     accept: "允许",
     reject: "拒绝",
   },

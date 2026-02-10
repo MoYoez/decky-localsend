@@ -930,6 +930,7 @@ export default definePlugin(() => {
     if (event.type === "confirm_download") {
       const data = event.data ?? {};
       const sessionId = String(data.sessionId || "");
+      const clientKey = String(data.clientKey || "");
       const fileCount = Number(data.fileCount || 0);
       const files = Array.isArray(data.files) ? data.files : [];
       const totalFiles = data.totalFiles != null ? Number(data.totalFiles) : undefined;
@@ -938,8 +939,11 @@ export default definePlugin(() => {
           fileCount={fileCount}
           files={files}
           totalFiles={totalFiles}
+          clientIp={data.clientIp != null ? String(data.clientIp) : undefined}
+          clientType={data.clientType != null ? String(data.clientType) : undefined}
+          userAgent={data.userAgent != null ? String(data.userAgent) : undefined}
           onConfirm={async (confirmed) => {
-            if (!sessionId) {
+            if (!sessionId || !clientKey) {
               toaster.toast({
                 title: t("toast.confirmFailed"),
                 body: t("toast.missingSessionId"),
@@ -947,7 +951,7 @@ export default definePlugin(() => {
               return;
             }
             try {
-              await confirmDownload(sessionId, confirmed);
+              await confirmDownload(sessionId, clientKey, confirmed);
               toaster.toast({
                 title: confirmed ? t("toast.accepted") : t("toast.rejected"),
                 body: confirmed ? t("toast.receiveConfirmed") : t("toast.receiveRejected"),
