@@ -1,7 +1,7 @@
 {
   "name": "decky-localsend",
-  "version": "0.3.8",
-  "description": "Use Localsend in gaming mode.",
+  "version": "0.4.0",
+  "description": "Use Localsend in gaming mode, including fast copy & paste screenshot and text by using LocalSend Client.",
   "type": "module",
   "scripts": {
     "build": "rollup -c",

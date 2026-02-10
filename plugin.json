@@ -4,8 +4,8 @@
   "flags": [],
   "api_version": 1,
   "publish": {
-    "tags": ["localsend","transfer"],
-    "description": "Use Localsend in gaming mode.",
+    "tags": ["localsend","transfer","Clipboard","Text","Screenshot"],
+    "description": "Use Localsend in gaming mode, including fast copy & paste screenshot and text by using LocalSend Client.",
     "image": "https://raw.githubusercontent.com/moyoez/decky-localsend/main/.github/assets/preview.jpg"
   }
 }
