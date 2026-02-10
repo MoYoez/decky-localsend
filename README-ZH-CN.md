@@ -106,8 +106,39 @@
 > UDP 通信下，无论远程设备是 HTTP 还是 HTTPS，Decky-Localsend 都能扫描并发现。
 
 
+## 关于开发
+
+```bash
+
+# Fork 一份你自己的仓库 , 替换 {username} 为你的名字
+
+git clone --recurse-submodules git@github.com:{username}/Decky-Localsend.git
+
+cd Decky-Localsend/backend/localsend
+
+# 需要 Golang >= 1.25.7
+
+go mod tidy
+
+cd Decky-Localsend/backend/localsend/web
+
+# 需要 NodeJS > 20
+
+npm i
+
+npm build
+
+
+```
+
+### 编译
+
+参考 [Github Action Build](.github/workflows/build.yaml)
+
 ## 鸣谢
 
 - [LocalSend](https://localsend.org)
+
 > 这个插件是基于 Localsend 协议写的，所以快去给个Star吧！
+
 - [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader)

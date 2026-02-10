@@ -2,14 +2,13 @@
 
 <img src=".github/assets/send-to-back.svg" width="128" height="128" alt="Decky Localsend" />
 
-# Decky Localsend ![visitors](https://visitor-badge.laobi.icu/badge?page_id=moyoez/Decky-localsend) ![Release](https://img.shields.io/github/v/release/moyoez/decky-localsend) 
+# Decky Localsend ![visitors](https://visitor-badge.laobi.icu/badge?page_id=moyoez/Decky-localsend) ![Release](https://img.shields.io/github/v/release/moyoez/decky-localsend)
 
 <p>
   <img src="https://forthebadge.com/api/badges/generate?panels=2&primaryLabel=Build+With&secondaryLabel=+Go&primaryBGColor=%23f79102&primaryTextColor=%23ffffff&secondaryBGColor=%23389AD5&secondaryTextColor=%23ffffff&primaryFontSize=12&primaryFontWeight=600&primaryLetterSpacing=2&primaryFontFamily=Roboto&primaryTextTransform=uppercase&secondaryFontSize=12&secondaryFontWeight=900&secondaryLetterSpacing=2&secondaryFontFamily=Montserrat&secondaryTextTransform=uppercase&borderRadius=9" alt="Build With Go" style="vertical-align:middle;"/>
   <span style="display:inline-block; width:32px;"></span>
   <img src="https://forthebadge.com/api/badges/generate?panels=2&primaryLabel=Work+On&secondaryLabel=Steam+Deck&primaryBGColor=%23000000&primaryTextColor=%23ffffff&secondaryBGColor=%23389AD5&secondaryTextColor=%23ffffff&primaryFontSize=12&primaryFontWeight=600&primaryLetterSpacing=2&primaryFontFamily=Roboto&primaryTextTransform=uppercase&secondaryFontSize=12&secondaryFontWeight=900&secondaryLetterSpacing=2&secondaryFontFamily=Montserrat&secondaryTextTransform=uppercase&borderRadius=9" style="vertical-align:middle;"/>
 </p>
-
 
 [ENGLISH](README.md) | [简体中文](README-ZH-CN.md)
 
@@ -22,7 +21,6 @@ Related Backend Repo: [MoYoez/localsend-go](https://github.com/MoYoez/localsend-
 </div>
 
 ---
-
 
 ## Features
 
@@ -38,21 +36,18 @@ Related Backend Repo: [MoYoez/localsend-go](https://github.com/MoYoez/localsend-
 - Quickly share screenshots without switching to desk
 - Temporary sharing across multiple devices
 
-
 ## Usage
 
 > This plugin requires Decky Loader 3.0 or above.
 
 1. Install the plugin on your Steam Deck(Install from release / download from decky test Store (Decky Localsend 0.37-1a47753))
 
-> Not install Decky ? ｜ Refer [Decky-Loader](https://github.com/SteamDeckHomebrew/decky-loader) for help | If necessary, search [Youtube](https://www.youtube.com/watch?v=USnS9K0fpQM) for help.
+> Decky not installed?｜ Refer to [Decky-Loader](https://github.com/SteamDeckHomebrew/decky-loader) for help | If necessary, search [Youtube](https://www.youtube.com/watch?v=USnS9K0fpQM) for help.
 
-
-2. Open the plugin from the Quick Access menu
-3. The LocalSend server will start automatically when clicking start Backend
-4. Your Steam Deck will now be discoverable by other LocalSend clients
-5. Send files from any device running LocalSend to your Steam Deck
-
+1. Open the plugin from the Quick Access menu
+2. The LocalSend server will start automatically when clicking start Backend
+3. Your Steam Deck will now be discoverable by other LocalSend clients
+4. Send files from any device running LocalSend to your Steam Deck
 
 ## Configuration
 
@@ -91,7 +86,6 @@ You can customize these settings through the plugin interface.
 
 - When transferring a very large number of files (tested with 3000+ files) to the Deck, the sending side of LocalSend may appear to stutter or become choppy due to multiple running threads. However, this does not affect the actual file transfer.
 
-
 - HTTP scanning may cause increased latency. HTTP timeout has been set to 60 seconds and runs every 30 seconds by default. Devices are updated via Notify, so you do not need to manually refresh to see remote devices.
 
 - please consider not to transfer too much files(selected), which may cause UI crash,folder dont' effect.
@@ -106,9 +100,39 @@ You can customize these settings through the plugin interface.
 
 > With UDP communication, Decky-Localsend can discover remote devices regardless of whether their protocol is HTTP or HTTPS.
 
+## Development
+
+```bash
+
+# Fork YOURSELF REPO, replace {username} as your "username"
+
+git clone --recurse-submodules git@github.com:{username}/Decky-Localsend.git
+
+cd Decky-Localsend/backend/localsend
+
+# require Golang >= 1.25.7
+
+go mod tidy
+
+cd Decky-Localsend/backend/localsend/web
+
+# require NodeJS > 20
+
+npm i
+
+npm build
+
+
+```
+
+### Build
+
+Please refer to [Github Action Build](.github/workflows/build.yaml)
 
 ## Acknowledgments
 
 - [LocalSend](https://localsend.org)
+
 > This Plugin is based on Localsend Protocol, so pls give a star to this!
+
 - [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader)
