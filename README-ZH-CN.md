@@ -41,7 +41,12 @@
 
 ## 使用方法
 
-1. 在你的 Steam Deck 上安装本插件 (从 release 下载最新 Release 即可 / 或是进入测试商店下载测试版( Decky Localsend 0.37-1a47753))
+> 本插件需要在 Decky Loader 3.0 即以上运行
+
+1. 在你的 Steam Deck 上安装本插件 (从 release 下载最新 Release 即可 / 或是进入 Decky 测试商店下载测试版( Decky Localsend 0.37-1a47753 ))
+
+> 没有 Decky ? ｜ 请参考 [Decky-Loader](https://github.com/SteamDeckHomebrew/decky-loader) | 如果必要的话，你可以搜索一下 [B站](https://www.bilibili.com/video/BV1X5rGBdEDG) / [抖音](https://www.douyin.com/video/7593785753583340852) 以获取安装方式
+
 2. 从快捷访问菜单中打开插件
 3. 点击“启动后端”后，LocalSend 服务器会自动启动
 4. 你的 Steam Deck 现在可以被其他 LocalSend 客户端发现
@@ -99,11 +104,6 @@
 | HTTPS 通信    | HTTPS               | HTTPS                     | 仅支持与 HTTPS 协议设备互通                |
 
 > UDP 通信下，无论远程设备是 HTTP 还是 HTTPS，Decky-Localsend 都能扫描并发现。
-
-
-
-
-
 
 
 ## 鸣谢
