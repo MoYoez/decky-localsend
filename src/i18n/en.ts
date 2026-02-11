@@ -303,6 +303,7 @@ export const en = {
   receiveProgress: {
     receiving: "Receiving...",
     filesCount: "{current} / {total} files",
+    cancelReceive: "Cancel receive",
   },
 
   // Send progress (sender-side: during upload)
@@ -319,6 +320,7 @@ export const en = {
     textUploadCompleted: "Text Upload Completed",
     uploadEvent: "Upload Event",
     uploadCancelled: "Transfer cancelled by sender",
+    receiveCancelled: "Receive cancelled",
   },
 
   // File Received Modal

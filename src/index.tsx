@@ -50,6 +50,8 @@ import { proxyGet, proxyPost } from "./utils/proxyReq";
 import { requestPin } from "./utils/requestPin";
 import { LuSendToBack } from "react-icons/lu";
 
+let selfCancelledSessionId: string | null = null;
+
 function Content() {
 
   const devices = useLocalSendStore((state) => state.devices);
@@ -583,7 +585,20 @@ function Content() {
 
   return (
     <>
-      {receiveProgress && <ReceiveProgressPanel receiveProgress={receiveProgress} />}
+      {receiveProgress && (
+        <ReceiveProgressPanel
+          receiveProgress={receiveProgress}
+          onCancelReceive={async (sessionId) => {
+            selfCancelledSessionId = sessionId;
+            try {
+              await proxyPost(`/api/localsend/v2/cancel?sessionId=${encodeURIComponent(sessionId)}`);
+            } finally {
+              useLocalSendStore.getState().setReceiveProgress(null);
+              toaster.toast({ title: t("notify.receiveCancelled"), body: "" });
+            }
+          }}
+        />
+      )}
       <PanelSection title={t("backend.title")}>
         <PanelSectionRow>
           <ToggleField
@@ -975,6 +990,11 @@ export default definePlugin(() => {
 
     if (event.type === "upload_cancelled") {
       useLocalSendStore.getState().setReceiveProgress(null);
+      const dataSessionId = event.data?.sessionId;
+      if (dataSessionId === selfCancelledSessionId) {
+        selfCancelledSessionId = null;
+        return;
+      }
       toaster.toast({
         title: t("notify.uploadCancelled"),
         body: "",

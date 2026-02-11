@@ -306,6 +306,7 @@ export const zhCN: TranslationKeys = {
   receiveProgress: {
     receiving: "接收中...",
     filesCount: "{current} / {total} 个文件",
+    cancelReceive: "取消接收",
   },
 
   // Send progress (sender-side: during upload)
@@ -322,6 +323,7 @@ export const zhCN: TranslationKeys = {
     textUploadCompleted: "文本上传完成",
     uploadEvent: "上传事件",
     uploadCancelled: "对方已取消传输",
+    receiveCancelled: "已取消接收",
   },
 
   // File Received Modal
