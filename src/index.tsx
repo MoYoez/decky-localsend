@@ -1054,6 +1054,13 @@ export default definePlugin(() => {
       );
       if (totalFiles != null && completedCount != null) {
         useLocalSendStore.getState().setSendProgressStats(totalFiles, completedCount);
+        // When backend reports all files done, mark any remaining "uploading" entries as done
+        // so allDone triggers and "sending" does not get stuck (e.g. folder upload where fileIds don't match).
+        if (completedCount === totalFiles && totalFiles > 0) {
+          useLocalSendStore.getState().setUploadProgress((prev) =>
+            prev.map((p) => (p.status === "uploading" ? { ...p, status: "done" as const } : p))
+          );
+        }
       }
       return;
     }
