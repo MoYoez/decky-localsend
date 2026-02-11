@@ -12,7 +12,8 @@ export const createUploadHandlers = (
   setUploading: (uploading: boolean) => void,
   setUploadProgress: React.Dispatch<React.SetStateAction<UploadProgress[]>>,
   clearFiles: () => void,
-  setSendProgressStats?: (total: number | null, completed: number | null) => void
+  setSendProgressStats?: (total: number | null, completed: number | null) => void,
+  setCurrentUploadSessionId?: (id: string | null) => void
 ) => {
   // handleUpload now accepts an optional override device for quick send scenarios
   const handleUpload = async (overrideDevice?: ScanDevice) => {
@@ -117,6 +118,7 @@ export const createUploadHandlers = (
 
       const { sessionId, files: tokens } = prepareResult.data.data;
       setSendProgressStats?.(Object.keys(tokens).length, 0);
+      setCurrentUploadSessionId?.(sessionId);
 
       progress = progress.map((p) => ({ ...p, status: 'uploading' }));
       setUploadProgress(progress);
@@ -287,9 +289,8 @@ export const createUploadHandlers = (
         body: String(error),
       });
       setSendProgressStats?.(null, null);
-      setUploadProgress((prev) =>
-        prev.map((p) => ({ ...p, status: 'error', error: String(error) }))
-      );
+      setCurrentUploadSessionId?.(null);
+      setUploadProgress([]);
     } finally {
       setUploading(false);
     }

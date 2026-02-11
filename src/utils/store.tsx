@@ -90,6 +90,10 @@ interface LocalSendStore {
   sendProgressCompletedCount: number | null;
   setSendProgressStats: (total: number | null, completed: number | null) => void;
 
+  // Current upload session id (for cancel-upload; set after prepare, cleared when send ends)
+  currentUploadSessionId: string | null;
+  setCurrentUploadSessionId: (id: string | null) => void;
+
   // Reset all state
   resetAll: () => void;
 }
@@ -107,6 +111,7 @@ export const useLocalSendStore = create<LocalSendStore>((set) => ({
   uploadProgress: [],
   sendProgressTotalFiles: null,
   sendProgressCompletedCount: null,
+  currentUploadSessionId: null,
 
   // Actions for devices
   setDevices: (devices) => set({ devices }),
@@ -171,6 +176,8 @@ export const useLocalSendStore = create<LocalSendStore>((set) => ({
   setSendProgressStats: (total, completed) =>
     set({ sendProgressTotalFiles: total, sendProgressCompletedCount: completed }),
 
+  setCurrentUploadSessionId: (id) => set({ currentUploadSessionId: id }),
+
   // Reset all state to initial values
   resetAll: () => set({
     devices: [],
@@ -183,5 +190,6 @@ export const useLocalSendStore = create<LocalSendStore>((set) => ({
     uploadProgress: [],
     sendProgressTotalFiles: null,
     sendProgressCompletedCount: null,
+    currentUploadSessionId: null,
   }),
 }));

@@ -73,6 +73,7 @@ function Content() {
   const uploadProgress = useLocalSendStore((state) => state.uploadProgress);
   const setUploadProgress = useLocalSendStore((state) => state.setUploadProgress);
   const setSendProgressStats = useLocalSendStore((state) => state.setSendProgressStats);
+  const setCurrentUploadSessionId = useLocalSendStore((state) => state.setCurrentUploadSessionId);
   const [uploading, setUploading] = useState(false);
   const [saveReceiveHistory, setSaveReceiveHistory] = useState(true);
   const [networkInfo, setNetworkInfo] = useState<NetworkInfo[]>([]);
@@ -178,7 +179,8 @@ function Content() {
     setUploading,
     setUploadProgress,
     clearFiles,
-    setSendProgressStats
+    setSendProgressStats,
+    setCurrentUploadSessionId
   );
 
   const { fetchFavorites, handleAddToFavorites, handleRemoveFromFavorites } = createFavoritesHandlers(
@@ -380,6 +382,7 @@ function Content() {
 
       const { sessionId, files: tokens } = prepareResult.data.data;
       setSendProgressStats(Object.keys(tokens).length, 0);
+      setCurrentUploadSessionId(sessionId);
 
       progress = progress.map((p) => ({ ...p, status: 'uploading' }));
       setUploadProgress(progress);
@@ -513,9 +516,8 @@ function Content() {
         body: String(error),
       });
       setSendProgressStats(null, null);
-      setUploadProgress((prev) =>
-        prev.map((p) => ({ ...p, status: 'error', error: String(error) }))
-      );
+      setCurrentUploadSessionId(null);
+      setUploadProgress([]);
     } finally {
       setUploading(false);
     }
@@ -1038,6 +1040,27 @@ export default definePlugin(() => {
       useLocalSendStore.getState().setReceiveProgress((prev) => (prev?.sessionId === data.sessionId ? null : prev));
     }
 
+    if (event.type === "send_finished") {
+      const data = event.data ?? {};
+      const reason = String(data.reason ?? "completed");
+      const successCount = Number(data.successCount ?? 0);
+      const failedCount = Number(data.failedCount ?? 0);
+      useLocalSendStore.getState().setUploadProgress([]);
+      useLocalSendStore.getState().setSendProgressStats(null, null);
+      useLocalSendStore.getState().setCurrentUploadSessionId(null);
+      if (reason === "completed") {
+        toaster.toast({ title: t("sendProgress.sendCompleteToast"), body: "" });
+      } else if (reason === "cancelled") {
+        toaster.toast({ title: t("sendProgress.cancelSendToast"), body: "" });
+      } else if (reason === "rejected") {
+        toaster.toast({
+          title: t("sendProgress.rejectedToast"),
+          body: t("sendProgress.rejectedBody").replace("{success}", String(successCount)).replace("{failed}", String(failedCount)),
+        });
+      }
+      return;
+    }
+
     if (event.type === "send_progress") {
       const data = event.data ?? {};
       const fileId = String(data.fileId ?? "");
@@ -1054,12 +1077,15 @@ export default definePlugin(() => {
       );
       if (totalFiles != null && completedCount != null) {
         useLocalSendStore.getState().setSendProgressStats(totalFiles, completedCount);
-        // When backend reports all files done, mark any remaining "uploading" entries as done
-        // so allDone triggers and "sending" does not get stuck (e.g. folder upload where fileIds don't match).
+        // When backend reports all files done, close sending panel and toast
         if (completedCount === totalFiles && totalFiles > 0) {
           useLocalSendStore.getState().setUploadProgress((prev) =>
             prev.map((p) => (p.status === "uploading" ? { ...p, status: "done" as const } : p))
           );
+          useLocalSendStore.getState().setUploadProgress([]);
+          useLocalSendStore.getState().setSendProgressStats(null, null);
+          useLocalSendStore.getState().setCurrentUploadSessionId(null);
+          toaster.toast({ title: t("sendProgress.sendCompleteToast"), body: "" });
         }
       }
       return;

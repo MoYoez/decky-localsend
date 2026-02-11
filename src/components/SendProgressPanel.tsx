@@ -1,7 +1,10 @@
-import { PanelSection, PanelSectionRow } from "@decky/ui";
+import { PanelSection, PanelSectionRow, ButtonItem } from "@decky/ui";
+import { toaster } from "@decky/api";
 import { t } from "../i18n";
 import type { UploadProgress } from "../types/upload";
 import { useLocalSendStore } from "../utils/store";
+import { proxyPost } from "../utils/proxyReq";
+import { FaTimes } from "react-icons/fa";
 
 // Same theme as ReceiveProgressPanel for consistent card + progress bar layout
 const theme = {
@@ -25,11 +28,30 @@ interface SendProgressPanelProps {
  * Shown at top (same position as ReceiveProgressPanel) when uploadProgress has items.
  * Uses sendProgressTotalFiles/sendProgressCompletedCount from store when set (e.g. folder uploads);
  * otherwise falls back to uploadProgress length and done/error count.
- * Layout matches ReceiveProgressPanel (card + Museck-style progress bar).
+ * Layout matches ReceiveProgressPanel  .
  */
+const themeError = "#ff6b6b";
+
 export const SendProgressPanel = ({ uploadProgress }: SendProgressPanelProps) => {
   const sendProgressTotalFiles = useLocalSendStore((state) => state.sendProgressTotalFiles);
   const sendProgressCompletedCount = useLocalSendStore((state) => state.sendProgressCompletedCount);
+  const currentUploadSessionId = useLocalSendStore((state) => state.currentUploadSessionId);
+  const setUploadProgress = useLocalSendStore((state) => state.setUploadProgress);
+  const setSendProgressStats = useLocalSendStore((state) => state.setSendProgressStats);
+  const setCurrentUploadSessionId = useLocalSendStore((state) => state.setCurrentUploadSessionId);
+
+  const handleCancelSend = async () => {
+    const sessionId = currentUploadSessionId;
+    if (!sessionId) return;
+    try {
+      await proxyPost(`/api/self/v1/cancel-upload?sessionId=${encodeURIComponent(sessionId)}`);
+    } finally {
+      setUploadProgress([]);
+      setSendProgressStats(null, null);
+      setCurrentUploadSessionId(null);
+      toaster.toast({ title: t("sendProgress.cancelSendToast"), body: "" });
+    }
+  };
 
   const totalFiles = sendProgressTotalFiles ?? uploadProgress.length;
   const completedCount =
@@ -116,6 +138,26 @@ export const SendProgressPanel = ({ uploadProgress }: SendProgressPanelProps) =>
           )}
         </div>
       </PanelSectionRow>
+      {currentUploadSessionId && (
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={handleCancelSend}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                color: themeError,
+                fontSize: "12px",
+                fontWeight: "500",
+              }}
+            >
+              <FaTimes style={{ fontSize: "12px", flexShrink: 0 }} />
+              {t("sendProgress.cancelSend")}
+            </div>
+          </ButtonItem>
+        </PanelSectionRow>
+      )}
     </PanelSection>
   );
 };

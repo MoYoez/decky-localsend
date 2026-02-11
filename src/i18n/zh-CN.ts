@@ -313,6 +313,11 @@ export const zhCN: TranslationKeys = {
   sendProgress: {
     sending: "正在发送...",
     filesCount: "{current} / {total} 个文件",
+    cancelSend: "取消发送",
+    cancelSendToast: "已取消发送",
+    sendCompleteToast: "传输完毕",
+    rejectedToast: "对方已拒绝",
+    rejectedBody: "已传输 {success} 个，失败 {failed} 个",
   },
 
   // Notifications (receiver-side: upload started/cancelled/completed etc.)

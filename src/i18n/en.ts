@@ -310,6 +310,11 @@ export const en = {
   sendProgress: {
     sending: "Sending...",
     filesCount: "{current} / {total} files",
+    cancelSend: "Cancel send",
+    cancelSendToast: "Send cancelled",
+    sendCompleteToast: "Transfer complete",
+    rejectedToast: "Rejected by receiver",
+    rejectedBody: "{success} transferred, {failed} failed",
   },
 
   // Notifications (receiver-side: upload started/cancelled/completed etc.)
