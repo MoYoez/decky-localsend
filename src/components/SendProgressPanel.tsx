@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { PanelSection, PanelSectionRow, ButtonItem } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { t } from "../i18n";
@@ -6,8 +5,6 @@ import type { UploadProgress } from "../types/upload";
 import { useLocalSendStore } from "../utils/store";
 import { proxyPost } from "../utils/proxyReq";
 import { FaTimes } from "react-icons/fa";
-
-const SINGLE_FILE_AUTO_COMPLETE_MS = 10000;
 
 // Same theme as ReceiveProgressPanel for consistent card + progress bar layout
 const theme = {
@@ -56,22 +53,7 @@ export const SendProgressPanel = ({ uploadProgress }: SendProgressPanelProps) =>
     }
   };
 
-  // When 1/1 file, auto-show complete after 10s if still sending (avoids stuck UI when send_finished is delayed)
   const totalFiles = sendProgressTotalFiles ?? uploadProgress.length;
-  useEffect(() => {
-    if (totalFiles !== 1 || uploadProgress.length === 0) return;
-    const timer = setTimeout(() => {
-      const state = useLocalSendStore.getState();
-      if (state.uploadProgress.length > 0 && state.currentUploadSessionId != null) {
-        state.setUploadProgress([]);
-        state.setSendProgressStats(null, null);
-        state.setCurrentUploadSessionId(null);
-        toaster.toast({ title: t("sendProgress.sendCompleteToast"), body: "" });
-      }
-    }, SINGLE_FILE_AUTO_COMPLETE_MS);
-    return () => clearTimeout(timer);
-  }, [totalFiles, uploadProgress.length]);
-
   const completedCount =
     sendProgressCompletedCount ??
     uploadProgress.filter((p) => p.status === "done" || p.status === "error").length;

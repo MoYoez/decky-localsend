@@ -2,9 +2,12 @@ import { toaster } from "@decky/api";
 import { t } from "../i18n";
 import { proxyPost } from "../utils/proxyReq";
 import { requestPin } from "../utils/requestPin";
+import { useLocalSendStore } from "../utils/store";
 import type { FileInfo } from "../types/file";
 import type { UploadProgress } from "../types/upload";
 import type { ScanDevice } from "../types/devices";
+
+const SEND_FINISHED_SAFETY_TIMEOUT_MS = 15000;
 
 export const createUploadHandlers = (
   selectedDevice: ScanDevice | null,
@@ -36,8 +39,10 @@ export const createUploadHandlers = (
 
       setUploading(true);
     
-    // Result of upload-batch (used for completion toast and clearing panel when hasFilesToUpload)
+    // Result of upload-batch (used for error handling when not 200/207)
     let batchUploadResult: { status: number; data?: { result?: { total?: number; success?: number; failed?: number; results?: Array<{ fileId: string; success: boolean; error?: string }> }; error?: string } } | undefined;
+    let batchWaitForSendFinished = false;
+    let batchSessionIdForSafety: string | undefined;
 
     // Build progress display (folders show as single items)
     let progress: UploadProgress[] = selectedFiles.map((f) => ({
@@ -196,97 +201,35 @@ export const createUploadHandlers = (
         }
 
         if (!batchUploadResult) throw new Error("batch result missing");
-        if (batchUploadResult.status === 200) {
+        if (batchUploadResult.status === 200 || batchUploadResult.status === 207) {
+          // Success: let send_finished event handle cleanup and toast
+          batchWaitForSendFinished = true;
+          batchSessionIdForSafety = sessionId;
+        } else {
+          // Error: clear state and show toast
           const result = batchUploadResult.data?.result;
-          if (result?.results) {
-            // Mark folder items as done if folder upload succeeded
-            if (hasFolders) {
-              progress = progress.map((p) => {
-                if (folderItems.some((f) => f.id === p.fileId)) {
-                  return { ...p, status: 'done' };
-                }
-                return p;
-              });
-            }
-            // Mark regular files based on results
-            progress = progress.map((p) => {
-              const uploadResult = (result.results ?? []).find((r: { fileId: string; success: boolean; error?: string }) => r.fileId === p.fileId);
-              if (uploadResult?.success) {
-                return { ...p, status: 'done' };
-              } else if (uploadResult && !uploadResult.success) {
-                return { ...p, status: 'error', error: uploadResult?.error || t("upload.failedTitle") };
-              }
-              return p;
+          const success = result?.success ?? 0;
+          const failed = result?.failed ?? 0;
+          setUploadProgress([]);
+          setSendProgressStats?.(null, null);
+          setCurrentUploadSessionId?.(null);
+          if (failed > 0) {
+            toaster.toast({
+              title: t("upload.partialCompletedTitle"),
+              body: t("upload.partialCompletedBody")
+                .replace("{success}", String(success))
+                .replace("{failed}", String(failed)),
             });
           } else {
-            // No detailed results, mark all as done
-            progress = progress.map((p) => {
-              if (folderItems.some((f) => f.id === p.fileId) || regularFiles.some((f) => f.id === p.fileId)) {
-                return { ...p, status: 'done' };
-              }
-              return p;
+            toaster.toast({
+              title: t("upload.failedTitle"),
+              body: batchUploadResult.data?.error || t("upload.failedTitle"),
             });
           }
-        } else if (batchUploadResult.status === 207) {
-          // Partial success
-          const result = batchUploadResult.data?.result;
-          if (result?.results) {
-            progress = progress.map((p) => {
-              const uploadResult = (result.results ?? []).find((r: { fileId: string; success: boolean; error?: string }) => r.fileId === p.fileId);
-              if (uploadResult?.success) {
-                return { ...p, status: 'done' };
-              } else if (uploadResult) {
-                return { ...p, status: 'error', error: uploadResult?.error || t("upload.failedTitle") };
-              }
-              // For folder items without direct result match
-              if (folderItems.some((f) => f.id === p.fileId)) {
-                // Check overall success rate
-                if ((result.success ?? 0) > 0) {
-                  return { ...p, status: 'done' };
-                }
-              }
-              return p;
-            });
-          }
-        } else {
-          // All failed
-          progress = progress.map((p) => {
-            if (folderItems.some((f) => f.id === p.fileId) || regularFiles.some((f) => f.id === p.fileId)) {
-              return { ...p, status: 'error', error: batchUploadResult!.data?.error || t("upload.failedTitle") };
-            }
-            return p;
-          });
         }
       }
 
-      setUploadProgress(progress);
-
-      // When batch upload (folder/multi-file) returns 200 or 207, use backend result for toast and clear panel immediately.
-      // This avoids wrong "1 file" for folder and prevents the send panel from staying until send_finished.
-      if (hasFilesToUpload && batchUploadResult && (batchUploadResult.status === 200 || batchUploadResult.status === 207)) {
-        const result = batchUploadResult.data?.result;
-        const success = result?.success ?? 0;
-        const failed = result?.failed ?? 0;
-        setUploadProgress([]);
-        setSendProgressStats?.(null, null);
-        setCurrentUploadSessionId?.(null);
-        if (failed > 0 || batchUploadResult.status === 207) {
-          toaster.toast({
-            title: t("upload.partialCompletedTitle"),
-            body: t("upload.partialCompletedBody")
-              .replace("{success}", String(success))
-              .replace("{failed}", String(failed)),
-          });
-        } else {
-          toaster.toast({
-            title: t("upload.uploadCompletedTitle"),
-            body: t("upload.uploadCompletedBody")
-              .replace("{count}", String(success))
-              .replace("{files}", t("common.files")),
-          });
-          clearFiles();
-        }
-      } else {
+      if (!hasFilesToUpload || !batchWaitForSendFinished) {
         // Text-only or no batch: use UI progress for completion toast
         const allDone = progress.every((p) => p.status === 'done');
         const hasErrors = progress.some((p) => p.status === 'error');
@@ -327,6 +270,17 @@ export const createUploadHandlers = (
       setUploadProgress([]);
     } finally {
       setUploading(false);
+      if (batchWaitForSendFinished && batchSessionIdForSafety) {
+        setTimeout(() => {
+          const state = useLocalSendStore.getState();
+          if (state.currentUploadSessionId === batchSessionIdForSafety) {
+            state.setUploadProgress([]);
+            state.setSendProgressStats(null, null);
+            state.setCurrentUploadSessionId(null);
+            toaster.toast({ title: t("sendProgress.sendCompleteToast"), body: "" });
+          }
+        }, SEND_FINISHED_SAFETY_TIMEOUT_MS);
+      }
     }
   };
 
