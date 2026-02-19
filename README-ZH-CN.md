@@ -43,8 +43,9 @@
 > 本插件需要在 Decky Loader 3.0 即以上运行
 
 1. 在你的 Steam Deck 上安装本插件：  
-   - 可以从 release 下载最新 Release  
-   - 或者进入 Decky 测试商店下载测试版（Decky Localsend 0.45 - 963c075）(目前最新) 
+
+   - 进入 Decky 商店下载（Decky Localsend 0.45)
+   - 或者从 release 下载最新 Release  
    - 或者在 Decky 中以 URL 格式安装 输入
   
      > https://ba.sh/63Vg
